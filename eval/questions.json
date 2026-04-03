@@ -1,0 +1,17 @@
+[
+  {
+    "id": "q1",
+    "question": "What is the purpose of the GitLab Handbook?",
+    "expected_keywords": ["handbook", "guidance", "public"]
+  },
+  {
+    "id": "q2",
+    "question": "What information is usually found on GitLab direction pages?",
+    "expected_keywords": ["strategy", "direction", "priorities"]
+  },
+  {
+    "id": "q3",
+    "question": "How can an employee use handbook and direction pages together?",
+    "expected_keywords": ["handbook", "direction", "documentation"]
+  }
+]

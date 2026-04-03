@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: genai-chatbot-api
+    env: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_HOST
+        value: 0.0.0.0
+      - key: APP_PORT
+        value: 8000
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+      - key: GEMINI_EMBEDDING_MODEL
+        value: text-embedding-004
+      - key: EMBEDDING_DIMENSIONS
+        value: 768
+      - key: MAX_CONTEXT_CHUNKS
+        value: 4
+      - key: VECTOR_BACKEND
+        value: postgres
+      - key: POSTGRES_DSN
+        sync: false
+      - key: PGVECTOR_TABLE
+        value: knowledge_chunks
+      - key: SOURCE_URLS
+        value: https://handbook.gitlab.com,https://about.gitlab.com/direction/
