@@ -24,10 +24,14 @@ class Embedder:
             "content": {"parts": [{"text": text}]},
         }
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(endpoint, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(endpoint, json=payload)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPError:
+            # Fallback keeps retrieval available if embedding endpoint/model is unavailable.
+            return self._hash_embedding(text)
 
         values = data.get("embedding", {}).get("values", [])
         if not values:

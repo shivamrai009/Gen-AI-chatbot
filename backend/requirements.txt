@@ -8,3 +8,6 @@ beautifulsoup4==4.13.4
 lxml==6.0.0
 numpy==2.2.6
 psycopg[binary]==3.2.9
+python-jose[cryptography]==3.3.0
+bcrypt==4.3.0
+python-multipart==0.0.20

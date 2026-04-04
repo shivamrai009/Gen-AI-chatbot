@@ -10,6 +10,7 @@ GenAI chatbot for employees and aspiring employees to explore GitLab Handbook an
 - Health check endpoint `GET /health`
 - Ingestion utilities for fetching and chunking page content
 - Embedding-based local vector retrieval over indexed chunks
+- Hierarchy-preserving section chunking and lightweight entity graph retrieval
 - Incremental sync pipeline using checksum manifest
 - React + Vite frontend with:
 - Chat interface
@@ -30,6 +31,23 @@ You can run retrieval in two modes:
 - `scripts/sync_index.py`: incremental sync (updates only changed pages and removes deleted sources).
 - `scripts/seed_sources.py`: quick fetch/chunk sanity check.
 - `scripts/evaluate.py`: lightweight quality evaluation over a fixed question set.
+
+The retrieval path is now hybrid:
+
+- vector similarity over indexed chunks
+- entity graph retrieval over related concepts
+- weighted merge of vector and graph evidence
+
+Indexing now supports depth-limited internal link expansion from each seed URL so retrieval can use relevant subpages instead of only landing pages.
+
+The chat pipeline now includes a lightweight agentic orchestrator:
+
+- query router (`vector`, `graph`, `hybrid`, `clarify`, `reject`)
+- retrieval execution by route
+- answer generation
+- critic pass to detect weak grounding and trigger one retry
+- guardrails for off-scope and harmful-intent detection
+- structured telemetry logs for route/retrieval/generation/critic stages
 
 ## Repository structure
 
@@ -148,6 +166,26 @@ Response:
 }
 ```
 
+### Streaming chat
+
+`POST /chat/stream`
+
+Returns server-sent events with token chunks (`message`), metadata (`meta`), sources (`sources`), and completion (`done`).
+
+### Feedback
+
+`POST /feedback`
+
+Request:
+
+```json
+{
+	"trace_id": "<trace-id-from-chat-response>",
+	"vote": "up",
+	"comment": "Useful answer"
+}
+```
+
 ## Data ingestion bootstrap
 
 Use the scripts below to bootstrap data:
@@ -175,6 +213,12 @@ EMBEDDING_DIMENSIONS=768
 
 Then run the same index build command. The script will auto-create the pgvector extension, table, and ANN index.
 
+Useful crawl controls in `backend/.env`:
+
+- `CRAWL_DEPTH` (default `1`)
+- `MAX_CHILD_LINKS_PER_PAGE` (default `12`)
+- `MAX_EXPANDED_PAGES_PER_SEED` (default `25`)
+
 Run incremental sync:
 
 ```bash
@@ -188,6 +232,18 @@ Run evaluation:
 cd backend
 PYTHONPATH=. python ../scripts/evaluate.py
 ```
+
+Evaluation now reports:
+
+- citation coverage
+- keyword adequacy
+- route accuracy
+- guardrail handling
+- critic pass rate
+
+Telemetry output:
+
+- runtime traces are written to `backend/data/telemetry.log`
 
 ## Testing
 

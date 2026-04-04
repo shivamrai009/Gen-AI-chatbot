@@ -15,6 +15,9 @@ dist/
 *.env.local
 backend/data/vector_index.json
 backend/data/sync_manifest.json
+backend/data/knowledge_graph.json
+backend/data/feedback.json
+backend/data/telemetry.log
 
 # IDE
 .vscode/

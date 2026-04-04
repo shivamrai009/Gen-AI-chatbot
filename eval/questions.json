@@ -2,16 +2,31 @@
   {
     "id": "q1",
     "question": "What is the purpose of the GitLab Handbook?",
-    "expected_keywords": ["handbook", "guidance", "public"]
+    "expected_keywords": ["handbook", "guidance", "public"],
+    "expected_route": "vector"
   },
   {
     "id": "q2",
     "question": "What information is usually found on GitLab direction pages?",
-    "expected_keywords": ["strategy", "direction", "priorities"]
+    "expected_keywords": ["strategy", "direction", "priorities"],
+    "expected_route": "vector"
   },
   {
     "id": "q3",
     "question": "How can an employee use handbook and direction pages together?",
-    "expected_keywords": ["handbook", "direction", "documentation"]
+    "expected_keywords": ["handbook", "direction", "documentation"],
+    "expected_route": "hybrid"
+  },
+  {
+    "id": "q4",
+    "question": "Write code for a weather app in python",
+    "expected_keywords": [],
+    "expected_route": "reject"
+  },
+  {
+    "id": "q5",
+    "question": "Who is responsible for deployment policy and how does it impact marketing launches?",
+    "expected_keywords": ["deployment", "marketing", "strategy"],
+    "expected_route": "hybrid"
   }
 ]

@@ -18,6 +18,7 @@ class IndexedChunk:
     snippet: str
     chunk_text: str
     embedding: list[float]
+    section_path: str = "General"
 
 
 class LocalVectorStore:
@@ -58,7 +59,12 @@ class LocalVectorStore:
 
         raw = self.index_path.read_text(encoding="utf-8")
         data = json.loads(raw)
-        return [IndexedChunk(**item) for item in data]
+        chunks: list[IndexedChunk] = []
+        for item in data:
+            if "section_path" not in item:
+                item["section_path"] = "General"
+            chunks.append(IndexedChunk(**item))
+        return chunks
 
     def query_similar(self, query_embedding: list[float], top_k: int) -> list[IndexedChunk]:
         chunks = self.load()
@@ -107,14 +113,15 @@ class PgVectorStore:
                 for chunk in chunks:
                     cur.execute(
                         f"""
-                        INSERT INTO {self.table_name} (id, title, url, snippet, chunk_text, embedding)
-                        VALUES (%s, %s, %s, %s, %s, %s::vector)
+                        INSERT INTO {self.table_name} (id, title, url, snippet, chunk_text, section_path, embedding)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s::vector)
                         ON CONFLICT (id)
                         DO UPDATE SET
                             title = EXCLUDED.title,
                             url = EXCLUDED.url,
                             snippet = EXCLUDED.snippet,
                             chunk_text = EXCLUDED.chunk_text,
+                            section_path = EXCLUDED.section_path,
                             embedding = EXCLUDED.embedding
                         """,
                         (
@@ -123,6 +130,7 @@ class PgVectorStore:
                             chunk.url,
                             chunk.snippet,
                             chunk.chunk_text,
+                            chunk.section_path,
                             self._vector_literal(chunk.embedding),
                         ),
                     )
@@ -153,7 +161,7 @@ class PgVectorStore:
         with psycopg.connect(self.dsn, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT id, title, url, snippet, chunk_text, embedding::text AS embedding_text FROM {self.table_name}"
+                    f"SELECT id, title, url, snippet, chunk_text, COALESCE(section_path, 'General') AS section_path, embedding::text AS embedding_text FROM {self.table_name}"
                 )
                 rows = cur.fetchall()
 
@@ -165,6 +173,7 @@ class PgVectorStore:
                 snippet=row["snippet"],
                 chunk_text=row["chunk_text"],
                 embedding=self._parse_vector_text(row["embedding_text"]),
+                section_path=row.get("section_path", "General"),
             )
             for row in rows
         ]
@@ -175,7 +184,7 @@ class PgVectorStore:
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    SELECT id, title, url, snippet, chunk_text, embedding::text AS embedding_text
+                    SELECT id, title, url, snippet, chunk_text, COALESCE(section_path, 'General') AS section_path, embedding::text AS embedding_text
                     FROM {self.table_name}
                     ORDER BY embedding <=> %s::vector
                     LIMIT %s
@@ -192,6 +201,7 @@ class PgVectorStore:
                 snippet=row["snippet"],
                 chunk_text=row["chunk_text"],
                 embedding=self._parse_vector_text(row["embedding_text"]),
+                section_path=row.get("section_path", "General"),
             )
             for row in rows
         ]
@@ -208,9 +218,13 @@ class PgVectorStore:
                         url TEXT NOT NULL,
                         snippet TEXT NOT NULL,
                         chunk_text TEXT NOT NULL,
+                        section_path TEXT,
                         embedding vector({self.embedding_dimensions}) NOT NULL
                     )
                     """
+                )
+                cur.execute(
+                    f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS section_path TEXT"
                 )
                 cur.execute(
                     f"CREATE INDEX IF NOT EXISTS {self.table_name}_embedding_idx ON {self.table_name} USING hnsw (embedding vector_cosine_ops)"
