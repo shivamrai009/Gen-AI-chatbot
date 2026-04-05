@@ -1,94 +1,88 @@
 # Deployment Guide
 
-Architecture: **Frontend → Vercel** · **Backend → Render (Docker)**
+Architecture: **Next.js app → Vercel** (single platform, no separate backend needed)
 
 ---
 
-## 1 — Deploy the Backend to Render
+## 1 — Deploy to Vercel
 
 ### One-time setup
 
-1. Push this repo to GitHub (the `render.yaml` auto-configures the service)
-2. Go to [render.com](https://render.com) → New → **Blueprint**
-3. Connect your GitHub repo — Render reads `render.yaml` automatically
-
-### Environment variables to set in the Render dashboard
-
-After the service is created, go to **Environment** and add:
-
-| Variable | Value |
-|---|---|
-| `GEMINI_API_KEY` | Your key from [aistudio.google.com](https://aistudio.google.com/app/apikey) |
-| `GROQ_API_KEY` | Your key from [console.groq.com](https://console.groq.com/keys) (optional fallback) |
-| `JWT_SECRET` | Run `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `ALLOWED_ORIGINS` | Your Vercel frontend URL, e.g. `https://your-app.vercel.app` |
-
-Everything else is pre-configured in `render.yaml`.
-
-### Notes
-- Free tier services **spin down after 15 min of inactivity** (first request after sleep is slow ~30s)
-- Free tier has **ephemeral storage** — chat history and user accounts reset on restart
-- Upgrade to the **Starter plan ($7/mo)** and uncomment the `disk:` block in `render.yaml` to persist data
-
----
-
-## 2 — Deploy the Frontend to Vercel
-
-### One-time setup
-
-1. Go to [vercel.com](https://vercel.com) → New Project → Import your GitHub repo
-2. Set **Root Directory** to `frontend`
-3. Framework will auto-detect as **Vite**
-4. Click Deploy
+1. Push this repo to GitHub
+2. Go to [vercel.com](https://vercel.com) → New Project → Import your GitHub repo
+3. Set **Root Directory** to `nextapp`
+4. Framework auto-detects as **Next.js**
+5. Click **Deploy**
 
 ### Environment variables to set in Vercel dashboard
 
 Go to **Project → Settings → Environment Variables**:
 
-| Variable | Value |
-|---|---|
-| `VITE_API_BASE_URL` | Your Render backend URL, e.g. `https://gitlab-ai-backend.onrender.com` |
+| Variable | Required | Value |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | From [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| `JWT_SECRET` | Yes | Run: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `KV_REST_API_URL` | Recommended | From a Vercel KV database (see below) |
+| `KV_REST_API_TOKEN` | Recommended | From the same Vercel KV database |
+| `GROQ_API_KEY` | No | From [console.groq.com](https://console.groq.com/keys) — follow-up fallback |
+
+### Setting up Vercel KV (persistent chat history)
+
+1. In your Vercel project → **Storage** → **Create Database** → **KV**
+2. Connect the KV database to your project
+3. Vercel automatically injects `KV_REST_API_URL` and `KV_REST_API_TOKEN`
+
+Without KV, the app uses an in-memory store — data resets on every cold start.
 
 ### Notes
 - Every push to `main` triggers an automatic redeploy
-- The `frontend/vercel.json` handles SPA routing (so `/chat` doesn't 404 on refresh)
-- **Do not** set `VITE_API_BASE_URL` for Preview deployments if you want them to use a separate backend
+- The vector index (`nextapp/data/vector_index.json`) is committed to the repo — no separate data pipeline needed on Vercel
 
 ---
 
-## 3 — Local Development
+## 2 — Local Development
 
 ```bash
-# Backend
-cd backend
-cp .env.example .env          # fill in your API keys
-python -m uvicorn app.main:app --reload --port 8000
-# OR from repo root:
-python run.py --reload
-
-# Frontend (in a new terminal)
-cd frontend
-cp .env.example .env.local    # leave VITE_API_BASE_URL empty for dev proxy
+cd nextapp
+cp .env.example .env.local    # fill in at minimum GEMINI_API_KEY
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — Vite proxies all API calls to http://localhost:8000.
+Open http://localhost:3000.
+
+Without `KV_REST_API_URL` set, the app uses in-memory storage — perfectly fine for local testing.
 
 ---
 
-## 4 — Rebuild the Knowledge Index
+## 3 — Rebuild the Knowledge Index
 
-The vector index (`data/vector_index.json`) and knowledge graph (`data/knowledge_graph.json`)
-are committed to the repo and baked into the Docker image. To rebuild them:
+The vector index and knowledge graph are committed to the repo at `nextapp/data/`. To rebuild from the latest GitLab Handbook:
 
 ```bash
-cd /repo-root
+# From repo root (requires Python 3.10+)
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r backend/requirements.txt
-python scripts/build_index.py
+
+python scripts/build_index.py        # full rebuild (~20 min)
+# OR
+python scripts/sync_index.py         # incremental sync (changed pages only)
+
+# Copy updated files into the Next.js app
+cp backend/data/vector_index.json nextapp/data/
+cp backend/data/knowledge_graph.json nextapp/data/
 ```
 
-Then commit and push — Render will rebuild the Docker image automatically.
+Then commit and push — Vercel redeploys automatically.
+
+---
+
+## 4 — Alternative: Backend + Separate Frontend (legacy)
+
+The `backend/` (FastAPI) and `frontend/` (React/Vite) directories are the original architecture.
+They still work but are superseded by the Next.js app. Use `render.yaml` to deploy the Python
+backend to Render if needed (e.g. for the Python evaluation scripts in production).
 
 ---
 
@@ -96,20 +90,21 @@ Then commit and push — Render will rebuild the Docker image automatically.
 
 ```
 .
-├── backend/                  # FastAPI backend (deployed to Render)
-│   ├── app/                  # Application code
+├── nextapp/                  # Next.js app — deploy this to Vercel
+│   ├── app/                  # Route Handlers + pages
+│   ├── lib/                  # Core pipeline (orchestrator, retriever, gemini, ...)
 │   ├── data/
-│   │   ├── vector_index.json     # Pre-built vector embeddings (committed)
+│   │   ├── vector_index.json     # Pre-built embeddings (committed)
 │   │   └── knowledge_graph.json  # Knowledge graph (committed)
+│   ├── .env.example
+│   └── package.json
+├── backend/                  # FastAPI backend (index building + reference)
+│   ├── app/
+│   ├── data/                 # Source of truth for index files
 │   ├── Dockerfile
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/                 # React/Vite frontend (deployed to Vercel)
-│   ├── src/
-│   ├── vercel.json
-│   ├── package.json
-│   └── .env.example
-├── scripts/                  # Index builder and eval scripts
-├── render.yaml               # Render Blueprint config (backend)
-└── run.py                    # Local dev shortcut: python run.py
+│   └── requirements.txt
+├── frontend/                 # Legacy React/Vite frontend (superseded)
+├── scripts/                  # build_index.py, sync_index.py, evaluate.py
+├── render.yaml               # Render Blueprint config (legacy backend)
+└── run.py                    # Quick backend launcher: python run.py
 ```

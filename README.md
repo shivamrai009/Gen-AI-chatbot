@@ -1,286 +1,247 @@
-# Gen-AI-chatbot
+# GitLab AI Chatbot
 
-GenAI chatbot for employees and aspiring employees to explore GitLab Handbook and Direction content through a simple conversational interface.
+A GenAI chatbot that lets GitLab employees and candidates explore the [GitLab Handbook](https://handbook.gitlab.com) and [Direction](https://about.gitlab.com/direction/) through a conversational interface. Built with Next.js (App Router) on Vercel and powered by Gemini 2.0 Flash.
 
-## Current implementation (starter MVP)
+**Live demo:** _(add your Vercel URL here)_
 
-- FastAPI backend with:
-- `POST /chat` endpoint
-- Gemini API integration (with fallback mode if API key is missing)
-- Health check endpoint `GET /health`
-- Ingestion utilities for fetching and chunking page content
-- Embedding-based local vector retrieval over indexed chunks
-- Hierarchy-preserving section chunking and lightweight entity graph retrieval
-- Incremental sync pipeline using checksum manifest
-- React + Vite frontend with:
-- Chat interface
-- Suggested prompts
-- Follow-up support
-- Source links in responses
+---
 
-This is the first implementation slice with real retrieval. The chatbot now reads from a local embedding index generated from GitLab Handbook and Direction pages.
+## Features
 
-You can run retrieval in two modes:
+- **Hybrid RAG** — vector similarity search + knowledge graph entity retrieval, merged and ranked
+- **Streaming answers** — server-sent events (SSE), tokens appear word-by-word
+- **Agentic pipeline** — query router → retrieval → answer generation → AI critic → follow-ups
+- **Guardrails** — blocks off-scope and harmful queries before they reach the LLM
+- **AI Critic** — lexical grounding check with one automatic retry on weak answers
+- **Follow-up chips** — 3 contextual follow-up questions generated per answer
+- **Source citations** — every answer links back to the handbook/direction pages used
+- **Authentication** — JWT-based register/login with bcrypt password hashing
+- **Chat history** — conversations persisted in Vercel KV (Upstash Redis); in-memory fallback for local dev
+- **Light/dark theme** — system-preference aware with flash-free toggle
+- **Markdown rendering** — full GFM support (tables, code blocks, lists) in chat bubbles
+- **Feedback** — thumbs up/down per answer stored for later analysis
+- **Telemetry** — structured per-request trace logs (route, retrieval, generation, critic stages)
+- **Evaluation** — `scripts/evaluate.py` reports citation coverage, keyword adequacy, route accuracy, guardrail handling, critic pass rate
 
-- local: saves vectors in `backend/data/vector_index.json`
-- postgres: stores vectors in Postgres with pgvector
+---
 
-## Core scripts
+## Architecture
 
-- `scripts/build_index.py`: full rebuild of the vector index from configured source URLs.
-- `scripts/sync_index.py`: incremental sync (updates only changed pages and removes deleted sources).
-- `scripts/seed_sources.py`: quick fetch/chunk sanity check.
-- `scripts/evaluate.py`: lightweight quality evaluation over a fixed question set.
+```
+User browser
+    │  SSE (text/event-stream)
+    ▼
+Next.js App Router (Vercel)
+    ├── app/api/chat/stream      — orchestration entry point
+    ├── app/api/auth/*           — register / login / me
+    ├── app/api/conversations/*  — CRUD + message history
+    └── app/api/feedback         — thumbs up/down
 
-The retrieval path is now hybrid:
+    lib/orchestrator.js
+        1. checkGuardrails()     — block harmful / off-scope
+        2. routeQuery()          — clarify / reject / vector / hybrid
+        3. embedText()           — Gemini embedding-001 (3072-dim)
+        4. searchVector()        — cosine similarity over local JSON index
+        5. generateAnswer()      — Gemini 2.0 Flash with full history
+        6. evaluateCritic()      — lexical overlap grounding check
+        7. generateFollowups()   — 3 follow-up questions (Groq fallback)
 
-- vector similarity over indexed chunks
-- entity graph retrieval over related concepts
-- weighted merge of vector and graph evidence
-
-Indexing now supports depth-limited internal link expansion from each seed URL so retrieval can use relevant subpages instead of only landing pages.
-
-The chat pipeline now includes a lightweight agentic orchestrator:
-
-- query router (`vector`, `graph`, `hybrid`, `clarify`, `reject`)
-- retrieval execution by route
-- answer generation
-- critic pass to detect weak grounding and trigger one retry
-- guardrails for off-scope and harmful-intent detection
-- structured telemetry logs for route/retrieval/generation/critic stages
-
-## Repository structure
-
-```text
-.
-├── backend
-│   ├── app
-│   │   ├── api
-│   │   ├── core
-│   │   ├── models
-│   │   └── services
-│   └── requirements.txt
-├── frontend
-│   └── src
-└── scripts
+Vercel KV (Upstash Redis)        — user accounts, conversations, messages
+data/vector_index.json           — 3072-dim embeddings (committed to repo)
+data/knowledge_graph.json        — entity relationship graph (committed)
 ```
 
-## Tech stack
+---
 
-- Backend: Python, FastAPI, httpx, BeautifulSoup
-- Frontend: React, Vite
-- LLM provider: Gemini API
+## Quick start — local development
 
-## Local setup
+### Prerequisites
 
-Optional (from repository root):
+- Node.js 20+
+- A [Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
+
+### 1. Install dependencies
 
 ```bash
+cd nextapp
+npm install
+```
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env.local
+# Edit .env.local and fill in your keys (see table below)
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | Gemini API key for generation + embeddings |
+| `JWT_SECRET` | Yes (prod) | 32+ char secret for JWT signing. Dev default is insecure. |
+| `KV_REST_API_URL` | No | Vercel KV URL — omit to use in-memory storage locally |
+| `KV_REST_API_TOKEN` | No | Vercel KV token |
+| `GROQ_API_KEY` | No | Groq key for follow-up fallback (llama-3.1-8b-instant) |
+
+### 3. Run the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Deploy to Vercel (recommended)
+
+1. Push this repo to GitHub
+2. Go to [vercel.com](https://vercel.com) → New Project → Import repo
+3. Set **Root Directory** to `nextapp`
+4. Framework auto-detects as **Next.js**
+5. Add environment variables in **Project → Settings → Environment Variables**:
+   - `GEMINI_API_KEY`
+   - `JWT_SECRET` (generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
+   - `KV_REST_API_URL` + `KV_REST_API_TOKEN` (from a Vercel KV database — see [Vercel KV docs](https://vercel.com/docs/storage/vercel-kv))
+   - `GROQ_API_KEY` (optional)
+6. Click **Deploy**
+
+Every push to `main` triggers an automatic redeploy.
+
+---
+
+## Rebuilding the knowledge index
+
+The vector index (`data/vector_index.json`) and knowledge graph (`data/knowledge_graph.json`) are committed to the repo and copied into `nextapp/data/` — they load directly from disk with no external DB needed.
+
+To rebuild from the latest GitLab Handbook and Direction pages:
+
+```bash
+# From repo root (requires Python 3.10+ and a virtual env)
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
+
+# Full rebuild (~20 min, ~44 MB output)
+python scripts/build_index.py
+
+# Incremental sync (only changed pages)
+python scripts/sync_index.py
+
+# Copy updated index into the Next.js app
+cp backend/data/vector_index.json nextapp/data/
+cp backend/data/knowledge_graph.json nextapp/data/
 ```
 
-For test dependencies from root:
+Then commit and push — Vercel will redeploy automatically.
 
-```bash
-pip install -r requirements-dev.txt
-```
+---
 
-### 1) Backend setup
+## Running evaluation
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
+PYTHONPATH=. python ../scripts/evaluate.py
 ```
 
-Add your Gemini key in `backend/.env`:
+Reports: citation coverage, keyword adequacy, route accuracy, guardrail handling, critic pass rate.
 
-```env
-GEMINI_API_KEY=your_key_here
+---
+
+## Repository structure
+
+```
+.
+├── nextapp/                  # Next.js app — deploy this to Vercel
+│   ├── app/
+│   │   ├── api/              # Route Handlers (chat, auth, conversations, feedback)
+│   │   ├── chat/             # Chat UI page
+│   │   ├── login/            # Login page
+│   │   ├── register/         # Register page
+│   │   └── page.jsx          # Landing page
+│   ├── components/           # ThemeProvider
+│   ├── lib/                  # Core pipeline (orchestrator, retriever, gemini, router, ...)
+│   ├── data/                 # vector_index.json + knowledge_graph.json (committed)
+│   └── .env.example
+├── backend/                  # Python FastAPI backend (reference / index building)
+│   ├── app/                  # API + services (guardrails, router, critic, orchestrator)
+│   ├── data/                 # Source of truth for index files
+│   └── requirements.txt
+├── scripts/                  # build_index.py, sync_index.py, evaluate.py
+├── frontend/                 # Legacy React/Vite frontend (superseded by nextapp/)
+├── DEPLOY.md                 # Detailed deployment guide
+└── run.py                    # Quick backend launcher: python run.py
 ```
 
-Run backend:
+---
 
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 2) Frontend setup
-
-```bash
-cd frontend
-npm install
-cp .env.example .env
-npm run dev
-```
-
-Open the app at `http://localhost:5173`.
-
-## API quick reference
+## API reference (Next.js routes)
 
 ### Health
 
-`GET /health`
+```
+GET /api/health
+→ { status: "ok", timestamp: "..." }
+```
 
-Response:
+### Auth
 
-```json
-{
-	"status": "ok",
-	"timestamp": "2026-04-03T00:00:00Z"
-}
+```
+POST /api/auth/register   { username, password }  → { token, user }
+POST /api/auth/login      { username, password }  → { token, user }
+GET  /api/auth/me                                  → { user }   (requires Bearer token)
 ```
 
 ### Chat
 
-`POST /chat`
+```
+POST /api/chat/stream
+Authorization: Bearer <token>
+{ question: "...", history: [{role, content}, ...] }
 
-Request:
-
-```json
-{
-	"question": "What is GitLab handbook-first culture?",
-	"history": [
-		{ "role": "user", "content": "Tell me about GitLab documentation" }
-	]
-}
+→ text/event-stream
+  event: message    data: <token>
+  event: meta       data: <model>|<route>|<traceId>|<criticPassed>
+  event: sources    data: [{title, url, snippet}, ...]
+  event: followups  data: ["...", "...", "..."]
+  event: done       data: [DONE]
+  event: error      data: <message>
 ```
 
-Response:
+### Conversations
 
-```json
-{
-	"answer": "...",
-	"sources": [
-		{
-			"title": "GitLab Handbook",
-			"url": "https://handbook.gitlab.com",
-			"snippet": "..."
-		}
-	],
-	"model": "gemini-2.0-flash"
-}
 ```
-
-### Streaming chat
-
-`POST /chat/stream`
-
-Returns server-sent events with token chunks (`message`), metadata (`meta`), sources (`sources`), and completion (`done`).
+GET    /api/conversations          → list user's conversations
+POST   /api/conversations          → create conversation
+GET    /api/conversations/:id      → get conversation
+DELETE /api/conversations/:id      → delete conversation
+GET    /api/conversations/:id/messages   → list messages
+POST   /api/conversations/:id/messages   → add message
+PATCH  /api/conversations/:id/title      → update title
+```
 
 ### Feedback
 
-`POST /feedback`
-
-Request:
-
-```json
-{
-	"trace_id": "<trace-id-from-chat-response>",
-	"vote": "up",
-	"comment": "Useful answer"
-}
+```
+POST /api/feedback   { traceId, vote: "up"|"down", comment? }
 ```
 
-## Data ingestion bootstrap
+---
 
-Use the scripts below to bootstrap data:
+## Tech stack
 
-```bash
-cd backend
-PYTHONPATH=. python ../scripts/seed_sources.py
-```
-
-Build the local vector index (required for retrieval):
-
-```bash
-cd backend
-PYTHONPATH=. python ../scripts/build_index.py
-```
-
-To use pgvector instead of local JSON storage, set these values in `backend/.env`:
-
-```env
-VECTOR_BACKEND=postgres
-POSTGRES_DSN=postgresql://user:password@host:5432/dbname
-PGVECTOR_TABLE=knowledge_chunks
-EMBEDDING_DIMENSIONS=768
-```
-
-Then run the same index build command. The script will auto-create the pgvector extension, table, and ANN index.
-
-Useful crawl controls in `backend/.env`:
-
-- `CRAWL_DEPTH` (default `1`)
-- `MAX_CHILD_LINKS_PER_PAGE` (default `12`)
-- `MAX_EXPANDED_PAGES_PER_SEED` (default `25`)
-
-Run incremental sync:
-
-```bash
-cd backend
-PYTHONPATH=. python ../scripts/sync_index.py
-```
-
-Run evaluation:
-
-```bash
-cd backend
-PYTHONPATH=. python ../scripts/evaluate.py
-```
-
-Evaluation now reports:
-
-- citation coverage
-- keyword adequacy
-- route accuracy
-- guardrail handling
-- critic pass rate
-
-Telemetry output:
-
-- runtime traces are written to `backend/data/telemetry.log`
-
-## Testing
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-pytest -q
-```
-
-## CI and automation
-
-- CI workflow: `.github/workflows/ci.yml`
-- Scheduled index sync workflow: `.github/workflows/sync-index.yml`
-
-Required repository secrets for scheduled sync:
-
-- `GEMINI_API_KEY`
-- `POSTGRES_DSN`
-
-## Deployment
-
-- Backend deployment scaffold:
-- `backend/Dockerfile`
-- `render.yaml`
-- Frontend deployment scaffold:
-- `frontend/vercel.json`
-
-If `GEMINI_API_KEY` is not set, the indexer and retriever use deterministic fallback embeddings so local testing still works.
-
-## Deployment targets (next step)
-
-- Frontend: Vercel
-- Backend: Render or Railway
-
-## Next milestones
-
-- Deploy public URL and document architecture/tradeoffs
-- Add deeper prompt/guardrail evaluation and regression scoring
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| LLM | Gemini 2.0 Flash (`gemini-2.0-flash`) |
+| Embeddings | Gemini Embedding-001 (3072 dimensions) |
+| Fallback LLM | Groq — Llama 3.1 8B Instant |
+| Auth | jose (JWT HS256) + bcryptjs |
+| Storage | Vercel KV (Upstash Redis) / in-memory fallback |
+| Retrieval | Local JSON vector index (cosine similarity) + knowledge graph |
+| Streaming | Server-Sent Events (ReadableStream) |
+| UI | React 19, CSS custom properties (dual theme) |
+| Markdown | react-markdown + remark-gfm |
+| Deployment | Vercel |
