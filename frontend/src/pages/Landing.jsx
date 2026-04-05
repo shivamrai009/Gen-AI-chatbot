@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { isLoggedIn } from "../auth";
+import { useTheme } from "../theme";
 
 const features = [
   {
@@ -42,6 +43,7 @@ const steps = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   function handleStart() {
     if (isLoggedIn()) navigate("/chat");
@@ -50,27 +52,33 @@ export default function Landing() {
 
   return (
     <div className="landing">
-      {/* Nav */}
+      {/* ── Nav ── */}
       <nav className="landing-nav">
-        <div className="landing-nav-logo">
-          <span className="logo-icon">⬡</span>
+        <div className="logo-wrap">
+          <div className="logo-icon">⬡</div>
           <span className="logo-text">GitLab <strong>AI</strong></span>
         </div>
         <div className="landing-nav-links">
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
           <button className="nav-btn-ghost" onClick={() => navigate("/login")}>Sign in</button>
           <button className="nav-btn-primary" onClick={() => navigate("/register")}>Get started</button>
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* ── Hero ── */}
       <section className="hero">
-        <div className="hero-badge">✦ Powered by Gemini 2.0 Flash + Knowledge Graph RAG</div>
+        <div className="hero-badge">
+          <span className="badge-dot" />
+          Powered by Gemini 2.0 Flash · Knowledge Graph RAG
+        </div>
         <h1 className="hero-title">
           Your GitLab Knowledge<br />
           <span className="hero-gradient">Intelligence Layer</span>
         </h1>
         <p className="hero-sub">
-          Instantly surface answers from GitLab's Handbook and Direction pages.<br />
+          Instantly surface answers from GitLab's Handbook and Direction pages.
           Grounded in sources. Verified by AI. Built for GitLab team members.
         </p>
         <div className="hero-actions">
@@ -82,16 +90,18 @@ export default function Landing() {
           </a>
         </div>
 
-        {/* Fake terminal preview */}
+        {/* Terminal preview */}
         <div className="hero-terminal">
           <div className="terminal-bar">
-            <span /><span /><span />
-            <p>gitlab-ai — chat</p>
+            <span className="terminal-dot red" />
+            <span className="terminal-dot amber" />
+            <span className="terminal-dot green" />
+            <span className="terminal-title">gitlab-ai — chat</span>
           </div>
           <div className="terminal-body">
-            <p><span className="t-user">you</span> What are GitLab's core values?</p>
+            <p><span className="t-user">you</span>What are GitLab's core values?</p>
             <p className="t-gap" />
-            <p><span className="t-ai">ai</span> GitLab's six core values are:</p>
+            <p><span className="t-ai">ai</span>GitLab's six core values are:</p>
             <p className="t-indent">🤝 <strong>Collaboration</strong> — help each other succeed</p>
             <p className="t-indent">📈 <strong>Results for Customers</strong> — focus on impact</p>
             <p className="t-indent">⏱️ <strong>Efficiency</strong> — boring solutions, fast delivery</p>
@@ -99,12 +109,12 @@ export default function Landing() {
             <p className="t-indent">🐾 <strong>Iteration</strong> — ship, learn, improve</p>
             <p className="t-indent">👁️ <strong>Transparency</strong> — default to public</p>
             <p className="t-gap" />
-            <p className="t-meta">📎 3 sources · route: vector · critic ✓</p>
+            <p className="t-meta">📎 3 sources · route: vector · critic ✓ verified</p>
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* ── Features ── */}
       <section className="features">
         <h2 className="section-title">Beyond a basic chatbot</h2>
         <p className="section-sub">Production-grade retrieval architecture, not a simple search wrapper.</p>
@@ -119,33 +129,36 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How it works */}
+      {/* ── How it works ── */}
       <section className="how">
         <h2 className="section-title">How it works</h2>
+        <p className="section-sub">Three steps from question to verified answer.</p>
         <div className="steps">
           {steps.map((s, i) => (
-            <div className="step" key={s.num}>
-              <div className="step-num">{s.num}</div>
-              <div>
+            <>
+              <div className="step" key={s.num}>
+                <div className="step-num">{s.num}</div>
                 <h3>{s.title}</h3>
                 <p>{s.desc}</p>
               </div>
-              {i < steps.length - 1 && <div className="step-arrow">→</div>}
-            </div>
+              {i < steps.length - 1 && (
+                <div className="step-connector" key={`arrow-${i}`}>→</div>
+              )}
+            </>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
+      {/* ── CTA ── */}
       <section className="cta-section">
         <h2>Ready to explore the handbook?</h2>
-        <p>Join thousands of GitLab team members getting instant, grounded answers.</p>
+        <p>Join GitLab team members getting instant, grounded answers.</p>
         <button className="btn-primary-lg" onClick={handleStart}>Get started for free →</button>
       </section>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer className="landing-footer">
-        <p>Built with ❤️ using Gemini 2.0 Flash · FastAPI · React</p>
+        <p>Built with Gemini 2.0 Flash · FastAPI · React · Knowledge Graph RAG</p>
         <p>Data sourced from <a href="https://handbook.gitlab.com" target="_blank" rel="noreferrer">handbook.gitlab.com</a></p>
       </footer>
     </div>

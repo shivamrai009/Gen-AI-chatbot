@@ -42,7 +42,7 @@ class GuardrailService:
         "okr",
     }
 
-    def check(self, question: str) -> GuardrailResult:
+    def check(self, question: str, history: list[dict] | None = None) -> GuardrailResult:
         lowered = question.lower()
 
         if any(term in lowered for term in self.SECURITY_BLOCK_TERMS):
@@ -65,19 +65,22 @@ class GuardrailService:
                 ),
             )
 
-        tokens = [token for token in self._normalize(lowered) if len(token) > 2]
-        if tokens:
-            domain_hits = sum(1 for token in tokens if token in self.DOMAIN_TERMS)
-            ratio = domain_hits / len(tokens)
-            if ratio < 0.06 and len(tokens) > 4:
-                return GuardrailResult(
-                    blocked=True,
-                    reason="low-domain-relevance",
-                    response=(
-                        "That looks outside this assistant's scope. "
-                        "Try asking about GitLab handbook policies, direction, teams, or delivery strategy."
-                    ),
-                )
+        # Skip domain-ratio check when the user is continuing an existing conversation —
+        # short replies like "yes", "tell me more", "explain" are contextual, not off-topic.
+        if not history:
+            tokens = [token for token in self._normalize(lowered) if len(token) > 2]
+            if tokens:
+                domain_hits = sum(1 for token in tokens if token in self.DOMAIN_TERMS)
+                ratio = domain_hits / len(tokens)
+                if ratio < 0.06 and len(tokens) > 4:
+                    return GuardrailResult(
+                        blocked=True,
+                        reason="low-domain-relevance",
+                        response=(
+                            "That looks outside this assistant's scope. "
+                            "Try asking about GitLab handbook policies, direction, teams, or delivery strategy."
+                        ),
+                    )
 
         return GuardrailResult(blocked=False, reason="allowed")
 

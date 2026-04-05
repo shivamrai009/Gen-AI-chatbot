@@ -1,35 +1,87 @@
 services:
   - type: web
-    name: genai-chatbot-api
+    name: gitlab-ai-backend
     env: docker
-    plan: free
+    plan: free              # upgrade to "starter" for persistent disk + no spin-down
     rootDir: backend
     dockerfilePath: ./Dockerfile
     autoDeploy: true
+
+    # ── Persistent disk for SQLite chat history & user accounts ──────────
+    # Remove or comment out on free plan (free plan does not support disk).
+    # Upgrade to "starter" ($7/mo) to keep chat history across restarts.
+    # disk:
+    #   name: gitlab-ai-data
+    #   mountPath: /app/data
+    #   sizeGB: 1
+
     envVars:
+      # ── App ────────────────────────────────────────────────────────────
       - key: APP_ENV
         value: production
       - key: APP_HOST
         value: 0.0.0.0
       - key: APP_PORT
         value: 8000
+
+      # ── CORS — set to your Vercel frontend URL ─────────────────────────
+      # Example: https://your-app.vercel.app
+      # Separate multiple origins with commas.
       - key: ALLOWED_ORIGINS
-        sync: false
+        sync: false         # set manually in Render dashboard
+
+      # ── Auth ───────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        sync: false         # generate a strong random secret, set in dashboard
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_MINUTES
+        value: 1440
+
+      # ── AI providers ───────────────────────────────────────────────────
       - key: GEMINI_API_KEY
-        sync: false
+        sync: false         # set in Render dashboard
       - key: GEMINI_MODEL
         value: gemini-2.0-flash
       - key: GEMINI_EMBEDDING_MODEL
-        value: text-embedding-004
+        value: gemini-embedding-001
+      - key: GROQ_API_KEY
+        sync: false         # optional fallback — set in Render dashboard
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: ROUTER_MODEL
+        value: gemini-2.0-flash
+      - key: CRITIC_MODEL
+        value: gemini-2.0-flash
+
+      # ── Vector / retrieval ─────────────────────────────────────────────
       - key: EMBEDDING_DIMENSIONS
-        value: 768
+        value: 3072
+      - key: VECTOR_BACKEND
+        value: local
+      - key: VECTOR_INDEX_PATH
+        value: data/vector_index.json
+      - key: GRAPH_PATH
+        value: data/knowledge_graph.json
       - key: MAX_CONTEXT_CHUNKS
         value: 4
-      - key: VECTOR_BACKEND
-        value: postgres
-      - key: POSTGRES_DSN
-        sync: false
-      - key: PGVECTOR_TABLE
-        value: knowledge_chunks
+      - key: MAX_REGENERATION_ATTEMPTS
+        value: 1
+      - key: OOD_SIMILARITY_THRESHOLD
+        value: "0.12"
+      - key: HYBRID_VECTOR_WEIGHT
+        value: "0.6"
+      - key: HYBRID_GRAPH_WEIGHT
+        value: "0.4"
+
+      # ── Storage paths (inside /app/data in the container) ─────────────
+      - key: USERS_PATH
+        value: data/users.json
+      - key: CHAT_DB_PATH
+        value: data/chats.db
+      - key: TELEMETRY_PATH
+        value: data/telemetry.log
+
+      # ── Source URLs (used if rebuilding the index) ────────────────────
       - key: SOURCE_URLS
-        value: https://handbook.gitlab.com,https://about.gitlab.com/direction/
+        value: "https://handbook.gitlab.com,https://about.gitlab.com/direction/"

@@ -1,26 +1,41 @@
-# Python
+# ── Python ───────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyw
 .venv/
 venv/
+*.egg-info/
+.pytest_cache/
 
-# Node
+# ── Node ─────────────────────────────────────────────────────────
 node_modules/
-dist/
+frontend/dist/
 
-# Environment
+# ── Environment / secrets (never commit these) ───────────────────
 .env
 *.env.local
-backend/data/vector_index.json
-backend/data/sync_manifest.json
-backend/data/knowledge_graph.json
+backend/.env
+
+# ── Runtime data (generated at runtime, not for git) ─────────────
+backend/data/chats.db
+backend/data/users.json
 backend/data/feedback.json
 backend/data/telemetry.log
+backend/data/eval_telemetry.log
+backend/data/sync_manifest.json
 
-# IDE
+# NOTE: vector_index.json and knowledge_graph.json ARE committed —
+# they are the pre-built knowledge index the app needs at startup.
+# To rebuild: python scripts/build_index.py
+
+# ── IDE / OS ─────────────────────────────────────────────────────
 .vscode/
-
-# OS
+.idea/
 .DS_Store
+Thumbs.db
+
+# ── Misc ─────────────────────────────────────────────────────────
+*.log
+*.tmp

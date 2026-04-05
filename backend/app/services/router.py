@@ -8,6 +8,7 @@ class RouteDecision:
     reason: str
 
 
+
 class RouterService:
     OFF_TOPIC_TERMS = {
         "python script",
@@ -30,11 +31,41 @@ class RouterService:
         "responsible",
     }
 
-    def decide(self, question: str) -> RouteDecision:
-        lowered = question.lower().strip()
+    # Generic filler phrases that carry no retrieval signal on their own
+    VAGUE_PATTERNS = {
+        "tell me something",
+        "tell me more",
+        "tell me",
+        "what do you know",
+        "what can you tell",
+        "just ask",
+        "i don't know",
+        "anything",
+        "something",
+        "go on",
+        "keep going",
+    }
 
-        if len(lowered.split()) <= 2:
-            return RouteDecision(route="clarify", confidence=0.8, reason="Query too short")
+    def decide(
+        self,
+        question: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> RouteDecision:
+        lowered = question.lower().strip()
+        words = lowered.split()
+
+        # ── If there is conversation history, never send short replies to "clarify" ──
+        # The user is continuing the conversation, not asking a standalone question.
+        if history and len(words) <= 4:
+            return RouteDecision(
+                route="vector",
+                confidence=0.75,
+                reason="Short contextual reply with active conversation history",
+            )
+
+        # ── Standalone short or vague query with no history → ask for more detail ──
+        if len(words) <= 2 or any(p in lowered for p in self.VAGUE_PATTERNS):
+            return RouteDecision(route="clarify", confidence=0.8, reason="Query too short or vague")
 
         if any(term in lowered for term in self.OFF_TOPIC_TERMS):
             return RouteDecision(route="reject", confidence=0.95, reason="Out-of-domain request")

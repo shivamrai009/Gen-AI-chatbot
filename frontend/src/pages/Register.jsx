@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { apiRegister, saveAuth } from "../auth";
+import { useTheme } from "../theme";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,20 +31,31 @@ export default function Register() {
 
   return (
     <div className="auth-page">
+      <button className="auth-theme-btn theme-toggle" onClick={toggleTheme} title="Toggle theme">
+        {theme === "dark" ? "☀️" : "🌙"}
+      </button>
+
       <div className="auth-card">
         <div className="auth-logo" onClick={() => navigate("/")}>
-          <span className="logo-icon">⬡</span>
+          <div className="logo-icon" style={{ width: 26, height: 26, fontSize: ".85rem", borderRadius: 7 }}>⬡</div>
           <span className="logo-text">GitLab <strong>AI</strong></span>
         </div>
+
         <h2 className="auth-title">Create your account</h2>
         <p className="auth-sub">Start exploring GitLab knowledge instantly</p>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <div className="auth-error">
+            <span>⚠</span> {error}
+          </div>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Username
+          <div className="form-field">
+            <label className="form-label" htmlFor="username">Username</label>
             <input
+              id="username"
+              className="form-input"
               type="text"
               placeholder="your_username"
               value={form.username}
@@ -51,31 +64,38 @@ export default function Register() {
               minLength={3}
               required
               autoFocus
+              autoComplete="username"
             />
-          </label>
-          <label>
-            Email
+          </div>
+          <div className="form-field">
+            <label className="form-label" htmlFor="email">Email</label>
             <input
+              id="email"
+              className="form-input"
               type="email"
               placeholder="you@gitlab.com"
               value={form.email}
               onChange={set("email")}
               required
+              autoComplete="email"
             />
-          </label>
-          <label>
-            Password
+          </div>
+          <div className="form-field">
+            <label className="form-label" htmlFor="password">Password</label>
             <input
+              id="password"
+              className="form-input"
               type="password"
               placeholder="At least 6 characters"
               value={form.password}
               onChange={set("password")}
               minLength={6}
               required
+              autoComplete="new-password"
             />
-          </label>
+          </div>
           <button type="submit" className="auth-submit" disabled={loading}>
-            {loading ? <span className="auth-spinner" /> : "Create account →"}
+            {loading ? <span className="spinner" /> : "Create account →"}
           </button>
         </form>
 

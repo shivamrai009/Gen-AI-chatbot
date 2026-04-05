@@ -34,7 +34,7 @@ class ChatOrchestrator:
         total_start = perf_counter()
 
         guard_start = perf_counter()
-        guardrail = self.guardrails.check(request.question)
+        guardrail = self.guardrails.check(request.question, history=request.history or [])
         self.telemetry.log(
             trace_id,
             "guardrails",
@@ -60,7 +60,7 @@ class ChatOrchestrator:
             return response
 
         route_start = perf_counter()
-        decision = self.router.decide(request.question)
+        decision = self.router.decide(request.question, history=request.history or [])
         self.telemetry.log(
             trace_id,
             "route",
@@ -111,9 +111,21 @@ class ChatOrchestrator:
             return response
 
         retrieval_mode = decision.route if decision.route in {"vector", "graph", "hybrid"} else "hybrid"
+
+        # When the current message is very short (e.g. "yes", "tell me more"),
+        # it carries no retrieval signal on its own. Build a richer query from
+        # the last user question in history so we retrieve relevant context.
+        retrieval_query = request.question
+        if len(request.question.split()) <= 4 and request.history:
+            prior_user_msgs = [
+                h["content"] for h in request.history if h.get("role") == "user"
+            ]
+            if prior_user_msgs:
+                retrieval_query = f"{prior_user_msgs[-1]} {request.question}".strip()
+
         retrieve_start = perf_counter()
         sources = await self.retriever.search_with_mode(
-            request.question,
+            retrieval_query,
             top_k=self.settings.max_context_chunks,
             mode=retrieval_mode,
         )

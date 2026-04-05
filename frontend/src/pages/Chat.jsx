@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { sendChatStream, sendFeedback } from "../api";
 import { getUser, getToken, clearAuth } from "../auth";
+import { useTheme } from "../theme";
 
 const GREETINGS = [
   "What would you like to explore in the GitLab Handbook today?",
@@ -37,14 +40,31 @@ async function apiConv(method, path, body) {
   return res.json();
 }
 
+// ── Markdown components ────────────────────────────────────────
+const mdComponents = {
+  a: ({ node, ...props }) => (
+    <a {...props} target="_blank" rel="noreferrer" />
+  ),
+  code: ({ node, inline, className, children, ...props }) => {
+    if (inline) {
+      return <code className={className} {...props}>{children}</code>;
+    }
+    return (
+      <pre>
+        <code className={className} {...props}>{children}</code>
+      </pre>
+    );
+  },
+};
+
 // ── Sub-components ─────────────────────────────────────────────
 function SourceCard({ source }) {
   const [open, setOpen] = useState(false);
-  const isHandbook = source.url.includes("handbook");
+  const isHandbook = source.url?.includes("handbook");
   return (
     <div className="source-card" onClick={() => setOpen(!open)}>
       <div className="source-card-header">
-        <div className="source-favicon">{isHandbook ? "📖" : "🔗"}</div>
+        <span className="source-favicon">{isHandbook ? "📖" : "🔗"}</span>
         <div className="source-info">
           <span className="source-title">{source.title}</span>
           {source.section && <span className="source-section">{source.section}</span>}
@@ -53,8 +73,10 @@ function SourceCard({ source }) {
       </div>
       {open && (
         <div className="source-body">
-          <p className="source-snippet">{source.snippet}</p>
-          <a href={source.url} target="_blank" rel="noreferrer" className="source-link">Open page ↗</a>
+          {source.snippet && <p className="source-snippet">{source.snippet}</p>}
+          <a href={source.url} target="_blank" rel="noreferrer" className="source-link">
+            Open page ↗
+          </a>
         </div>
       )}
     </div>
@@ -89,13 +111,13 @@ function Message({ msg, onFeedback, onFollowup }) {
 
   return (
     <div className="msg-row msg-ai-row">
-      <div className="msg-ai-avatar">⬡</div>
+      <div className="msg-avatar">⬡</div>
       <div className="msg-ai-block">
         {msg.route && (
           <div className="msg-meta-bar">
-            <span className={`route-badge route-${msg.route}`}>{msg.route}</span>
+            <span className={`badge badge-route route-${msg.route}`}>{msg.route}</span>
             {msg.criticPassed !== undefined && (
-              <span className={`critic-badge ${msg.criticPassed ? "critic-ok" : "critic-fail"}`}>
+              <span className={`badge ${msg.criticPassed ? "badge-critic-ok" : "badge-critic-fail"}`}>
                 {msg.criticPassed ? "✓ verified" : "⚠ unverified"}
               </span>
             )}
@@ -103,25 +125,34 @@ function Message({ msg, onFeedback, onFollowup }) {
         )}
 
         <div className={`msg-bubble msg-ai ${msg.streaming ? "streaming" : ""}`}>
-          {msg.streaming && !text
-            ? <span className="typing-dots"><span /><span /><span /></span>
-            : text}
+          {msg.streaming && !text ? (
+            <span className="typing-dots"><span /><span /><span /></span>
+          ) : (
+            <div className="prose">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {text}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
 
         {msg.sources?.length > 0 && (
           <div className="sources-section">
-            <p className="sources-label">📎 {msg.sources.length} source{msg.sources.length > 1 ? "s" : ""}</p>
+            <p className="sources-label">
+              📎 {msg.sources.length} source{msg.sources.length > 1 ? "s" : ""}
+            </p>
             {msg.sources.map((s, i) => <SourceCard key={i} source={s} />)}
           </div>
         )}
 
-        {/* Follow-up chips */}
         {!msg.streaming && msg.followups?.length > 0 && (
           <div className="followup-section">
             <p className="followup-label">Continue exploring</p>
             <div className="followup-chips">
               {msg.followups.map((q, i) => (
-                <button key={i} className="followup-chip" onClick={() => onFollowup(q)}>{q}</button>
+                <button key={i} className="followup-chip" onClick={() => onFollowup(q)}>
+                  {q}
+                </button>
               ))}
             </div>
           </div>
@@ -129,11 +160,19 @@ function Message({ msg, onFeedback, onFollowup }) {
 
         {!msg.streaming && text && (
           <div className="msg-actions">
-            <button className="action-btn" onClick={copy}>{copied ? "✓ Copied" : "⎘ Copy"}</button>
-            <button className={`action-btn feedback-btn ${voted === "up" ? "voted" : ""}`}
-              onClick={() => vote("up")} disabled={!!voted}>👍 Helpful</button>
-            <button className={`action-btn feedback-btn ${voted === "down" ? "voted" : ""}`}
-              onClick={() => vote("down")} disabled={!!voted}>👎 Not helpful</button>
+            <button className="action-btn" onClick={copy}>
+              {copied ? "✓ Copied" : "⎘ Copy"}
+            </button>
+            <button
+              className={`action-btn ${voted === "up" ? "voted" : ""}`}
+              onClick={() => vote("up")}
+              disabled={!!voted}
+            >👍 Helpful</button>
+            <button
+              className={`action-btn ${voted === "down" ? "voted" : ""}`}
+              onClick={() => vote("down")}
+              disabled={!!voted}
+            >👎 Not helpful</button>
           </div>
         )}
       </div>
@@ -144,6 +183,7 @@ function Message({ msg, onFeedback, onFollowup }) {
 // ── Main component ─────────────────────────────────────────────
 export default function Chat() {
   const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
   const username = getUser();
   const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
 
@@ -170,7 +210,6 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load conversation list on mount
   useEffect(() => {
     apiConv("GET", "")
       .then(setConversations)
@@ -178,23 +217,24 @@ export default function Chat() {
       .finally(() => setConvLoading(false));
   }, []);
 
-  // Load messages when switching conversations
   async function openConversation(conv) {
     setActiveConvId(conv.id);
     setSidebarOpen(false);
     const msgs = await apiConv("GET", `/${conv.id}/messages`).catch(() => []);
-    setMessages(msgs.map((m) => ({
-      id: m.id,
-      role: m.role === "assistant" ? "ai" : "user",
-      content: m.content,
-      answer: m.role === "assistant" ? m.content : undefined,
-      sources: m.sources || [],
-      route: m.route,
-      traceId: m.trace_id,
-    })));
+    setMessages(
+      msgs.map((m) => ({
+        id: m.id,
+        role: m.role === "assistant" ? "ai" : "user",
+        content: m.content,
+        answer: m.role === "assistant" ? m.content : undefined,
+        sources: m.sources || [],
+        route: m.route,
+        traceId: m.trace_id,
+      }))
+    );
   }
 
-  async function startNewConversation() {
+  function startNewConversation() {
     setActiveConvId(null);
     setMessages([]);
     setSidebarOpen(false);
@@ -209,120 +249,119 @@ export default function Chat() {
       }));
   }
 
-  const sendMessage = useCallback(async (text) => {
-    if (!text.trim() || loading) return;
-    const question = text.trim();
-    setInput("");
-    setLoading(true);
+  const sendMessage = useCallback(
+    async (text) => {
+      if (!text.trim() || loading) return;
+      const question = text.trim();
+      setInput("");
+      setLoading(true);
 
-    const userMsg = { id: `u-${Date.now()}`, role: "user", content: question };
-    const aiMsg = {
-      id: `a-${Date.now()}`, role: "ai", answer: "", streaming: true,
-      sources: [], route: null, criticPassed: null, traceId: null, followups: [],
-    };
+      const userMsg = { id: `u-${Date.now()}`, role: "user", content: question };
+      const aiMsg = {
+        id: `a-${Date.now()}`, role: "ai", answer: "", streaming: true,
+        sources: [], route: null, criticPassed: null, traceId: null, followups: [],
+      };
 
-    setMessages((prev) => [...prev, userMsg, aiMsg]);
+      setMessages((prev) => [...prev, userMsg, aiMsg]);
 
-    // Create conversation on first message
-    let convId = activeConvId;
-    if (!convId) {
+      let convId = activeConvId;
+      if (!convId) {
+        try {
+          const title = question.slice(0, 60);
+          const conv = await apiConv("POST", "", { title });
+          convId = conv.id;
+          setActiveConvId(convId);
+          setConversations((prev) => [conv, ...prev]);
+        } catch {}
+      }
+
+      if (convId) {
+        apiConv("POST", `/${convId}/messages`, { role: "user", content: question }).catch(() => {});
+      }
+
+      const streamData = { answer: "", sources: [], route: null, traceId: null };
+
       try {
-        const title = question.slice(0, 60);
-        const conv = await apiConv("POST", "", { title });
-        convId = conv.id;
-        setActiveConvId(convId);
-        setConversations((prev) => [conv, ...prev]);
-      } catch {}
-    }
-
-    // Save user message to DB
-    if (convId) {
-      apiConv("POST", `/${convId}/messages`, { role: "user", content: question }).catch(() => {});
-    }
-
-    // Accumulate stream data for DB save
-    const streamData = { answer: "", sources: [], route: null, traceId: null };
-
-    try {
-      await sendChatStream(question, buildHistory(), {
-        onToken: (token) => {
-          streamData.answer += token;
-          setMessages((prev) =>
-            prev.map((m) => m.id === aiMsg.id ? { ...m, answer: m.answer + token } : m)
-          );
-        },
-        onMeta: (data) => {
-          const [, route, traceId] = data.split("|");
-          streamData.route = route;
-          streamData.traceId = traceId;
-          setMessages((prev) =>
-            prev.map((m) => m.id === aiMsg.id ? { ...m, route, traceId } : m)
-          );
-        },
-        onSources: (data) => {
-          try {
-            const sources = JSON.parse(data);
-            streamData.sources = sources;
+        await sendChatStream(question, buildHistory(), {
+          onToken: (token) => {
+            streamData.answer += token;
             setMessages((prev) =>
-              prev.map((m) => m.id === aiMsg.id ? { ...m, sources } : m)
+              prev.map((m) => m.id === aiMsg.id ? { ...m, answer: m.answer + token } : m)
             );
-          } catch {}
-        },
-        onFollowups: (data) => {
-          try {
-            const followups = JSON.parse(data);
+          },
+          onMeta: (data) => {
+            const [, route, traceId] = data.split("|");
+            streamData.route = route;
+            streamData.traceId = traceId;
             setMessages((prev) =>
-              prev.map((m) => m.id === aiMsg.id ? { ...m, followups } : m)
+              prev.map((m) => m.id === aiMsg.id ? { ...m, route, traceId } : m)
             );
-          } catch {}
-        },
-        onDone: () => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiMsg.id ? { ...m, streaming: false, criticPassed: true } : m
-            )
-          );
-          setLoading(false);
-
-          // Save AI message to DB using streamed data
-          if (convId) {
-            apiConv("POST", `/${convId}/messages`, {
-              role: "assistant",
-              content: streamData.answer,
-              sources: streamData.sources,
-              route: streamData.route,
-              trace_id: streamData.traceId,
-            }).catch(() => {});
-            // Auto-rename conversation using first question
-            if (conversations.find((c) => c.id === convId)?.title === question.slice(0, 60)) {
-              const title = question.length > 50 ? question.slice(0, 50) + "…" : question;
-              apiConv("PATCH", `/${convId}/title`, { title }).catch(() => {});
-              setConversations((prev) =>
-                prev.map((c) => c.id === convId ? { ...c, title } : c)
+          },
+          onSources: (data) => {
+            try {
+              const sources = JSON.parse(data);
+              streamData.sources = sources;
+              setMessages((prev) =>
+                prev.map((m) => m.id === aiMsg.id ? { ...m, sources } : m)
               );
+            } catch {}
+          },
+          onFollowups: (data) => {
+            try {
+              const followups = JSON.parse(data);
+              setMessages((prev) =>
+                prev.map((m) => m.id === aiMsg.id ? { ...m, followups } : m)
+              );
+            } catch {}
+          },
+          onDone: () => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiMsg.id ? { ...m, streaming: false, criticPassed: true } : m
+              )
+            );
+            setLoading(false);
+
+            if (convId) {
+              apiConv("POST", `/${convId}/messages`, {
+                role: "assistant",
+                content: streamData.answer,
+                sources: streamData.sources,
+                route: streamData.route,
+                trace_id: streamData.traceId,
+              }).catch(() => {});
+
+              if (conversations.find((c) => c.id === convId)?.title === question.slice(0, 60)) {
+                const title = question.length > 50 ? question.slice(0, 50) + "…" : question;
+                apiConv("PATCH", `/${convId}/title`, { title }).catch(() => {});
+                setConversations((prev) =>
+                  prev.map((c) => c.id === convId ? { ...c, title } : c)
+                );
+              }
             }
-          }
-        },
-        onError: (err) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiMsg.id ? { ...m, answer: `Error: ${err}`, streaming: false } : m
-            )
-          );
-          setLoading(false);
-        },
-      });
-    } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === aiMsg.id
-            ? { ...m, answer: `Failed to connect: ${err.message}`, streaming: false }
-            : m
-        )
-      );
-      setLoading(false);
-    }
-  }, [loading, activeConvId, messages, conversations]);
+          },
+          onError: (err) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiMsg.id ? { ...m, answer: `Error: ${err}`, streaming: false } : m
+              )
+            );
+            setLoading(false);
+          },
+        });
+      } catch (err) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMsg.id
+              ? { ...m, answer: `Failed to connect: ${err.message}`, streaming: false }
+              : m
+          )
+        );
+        setLoading(false);
+      }
+    },
+    [loading, activeConvId, messages, conversations]
+  );
 
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -335,11 +374,11 @@ export default function Chat() {
     sendFeedback(traceId, vote).catch(() => {});
   }
 
-  async function deleteConversation(e, convId) {
+  async function deleteConversation(e, id) {
     e.stopPropagation();
-    await apiConv("DELETE", `/${convId}`).catch(() => {});
-    setConversations((prev) => prev.filter((c) => c.id !== convId));
-    if (activeConvId === convId) {
+    await apiConv("DELETE", `/${id}`).catch(() => {});
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (activeConvId === id) {
       setActiveConvId(null);
       setMessages([]);
     }
@@ -356,16 +395,22 @@ export default function Chat() {
 
   return (
     <div className="chat-page">
-      {/* Sidebar */}
+      {/* ── Sidebar ── */}
       <aside className={`chat-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-header">
-          <div className="auth-logo" onClick={() => navigate("/")}>
-            <span className="logo-icon">⬡</span>
+          <div className="logo-wrap" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
+            <div className="logo-icon">⬡</div>
             <span className="logo-text">GitLab <strong>AI</strong></span>
           </div>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
         </div>
+
         <div className="sidebar-body">
-          <button className="new-chat-btn" onClick={startNewConversation}>+ New conversation</button>
+          <button className="new-chat-btn" onClick={startNewConversation}>
+            <span>＋</span> New conversation
+          </button>
 
           {convLoading ? (
             <p className="sidebar-loading">Loading history…</p>
@@ -384,17 +429,18 @@ export default function Chat() {
                   <button
                     className="conv-delete"
                     onClick={(e) => deleteConversation(e, c.id)}
-                    title="Delete"
+                    title="Delete conversation"
                   >×</button>
                 </div>
               ))}
             </>
           )}
         </div>
+
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <div className="sidebar-avatar">{username?.[0]?.toUpperCase() || "U"}</div>
-            <span>{username}</span>
+            <div className="avatar avatar-md">{username?.[0]?.toUpperCase() || "U"}</div>
+            <span className="sidebar-username">{username}</span>
           </div>
           <button className="logout-btn" onClick={handleLogout}>Sign out</button>
         </div>
@@ -402,27 +448,35 @@ export default function Chat() {
 
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Main */}
+      {/* ── Main ── */}
       <main className="chat-main">
         <header className="chat-topbar">
           <button className="topbar-menu" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
           <div className="topbar-title">
-            <span className="logo-icon small">⬡</span> GitLab Knowledge AI
+            <div className="logo-wrap small">
+              <div className="logo-icon">⬡</div>
+              <span className="logo-text">GitLab <strong>AI</strong></span>
+            </div>
           </div>
-          <div className="topbar-user">
-            <div className="sidebar-avatar small">{username?.[0]?.toUpperCase() || "U"}</div>
+          <div className="topbar-right">
+            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
+            <div className="avatar avatar-sm">{username?.[0]?.toUpperCase() || "U"}</div>
           </div>
         </header>
 
         <div className="chat-messages">
           {isEmpty && (
             <div className="chat-empty">
-              <div className="empty-icon">⬡</div>
-              <h2>{timeGreeting}, {username}!</h2>
-              <p className="empty-greeting">{greeting}</p>
-              <div className="empty-suggestions">
+              <div className="empty-glyph">⬡</div>
+              <h2 className="empty-greeting-title">{timeGreeting}, {username}!</h2>
+              <p className="empty-greeting-sub">{greeting}</p>
+              <div className="suggestion-grid">
                 {SUGGESTED.map((s) => (
-                  <button key={s} className="suggestion-chip" onClick={() => sendMessage(s)}>{s}</button>
+                  <button key={s} className="suggestion-chip" onClick={() => sendMessage(s)}>
+                    {s}
+                  </button>
                 ))}
               </div>
             </div>
@@ -440,11 +494,11 @@ export default function Chat() {
         </div>
 
         <div className="chat-input-area">
-          <div className="chat-input-box">
+          <div className="chat-input-wrap">
             <textarea
               ref={inputRef}
               className="chat-textarea"
-              placeholder="Ask about GitLab handbook or direction… (Enter to send)"
+              placeholder="Ask about GitLab handbook or direction… (Enter to send, Shift+Enter for newline)"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -456,10 +510,12 @@ export default function Chat() {
               onClick={() => sendMessage(input)}
               disabled={loading || !input.trim()}
             >
-              {loading ? <span className="auth-spinner small" /> : "↑"}
+              {loading ? <span className="spinner sm" /> : "↑"}
             </button>
           </div>
-          <p className="input-hint">GitLab AI may make mistakes — always verify with the source links.</p>
+          <p className="input-hint">
+            GitLab AI may make mistakes — verify with the source links provided.
+          </p>
         </div>
       </main>
     </div>

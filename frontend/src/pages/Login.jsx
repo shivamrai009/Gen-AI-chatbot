@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { apiLogin, saveAuth } from "../auth";
+import { useTheme } from "../theme";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,40 +27,55 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <button className="auth-theme-btn theme-toggle" onClick={toggleTheme} title="Toggle theme">
+        {theme === "dark" ? "☀️" : "🌙"}
+      </button>
+
       <div className="auth-card">
         <div className="auth-logo" onClick={() => navigate("/")}>
-          <span className="logo-icon">⬡</span>
+          <div className="logo-icon" style={{ width: 26, height: 26, fontSize: ".85rem", borderRadius: 7 }}>⬡</div>
           <span className="logo-text">GitLab <strong>AI</strong></span>
         </div>
-        <h2 className="auth-title">Welcome back</h2>
-        <p className="auth-sub">Sign in to your account</p>
 
-        {error && <div className="auth-error">{error}</div>}
+        <h2 className="auth-title">Welcome back</h2>
+        <p className="auth-sub">Sign in to your account to continue</p>
+
+        {error && (
+          <div className="auth-error">
+            <span>⚠</span> {error}
+          </div>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Username
+          <div className="form-field">
+            <label className="form-label" htmlFor="username">Username</label>
             <input
+              id="username"
+              className="form-input"
               type="text"
               placeholder="your_username"
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               required
               autoFocus
+              autoComplete="username"
             />
-          </label>
-          <label>
-            Password
+          </div>
+          <div className="form-field">
+            <label className="form-label" htmlFor="password">Password</label>
             <input
+              id="password"
+              className="form-input"
               type="password"
               placeholder="••••••••"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
+              autoComplete="current-password"
             />
-          </label>
+          </div>
           <button type="submit" className="auth-submit" disabled={loading}>
-            {loading ? <span className="auth-spinner" /> : "Sign in →"}
+            {loading ? <span className="spinner" /> : "Sign in →"}
           </button>
         </form>
 
