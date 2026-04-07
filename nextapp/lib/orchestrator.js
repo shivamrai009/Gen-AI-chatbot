@@ -5,7 +5,7 @@ import { searchVector } from './retriever.js';
 import { evaluateCritic } from './critic.js';
 import { v4 as uuidv4 } from 'uuid';
 
-const TOP_K = 4;
+const TOP_K = 6;
 
 /**
  * Run the full RAG pipeline and return a response object.

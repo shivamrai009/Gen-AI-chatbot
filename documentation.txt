@@ -1,0 +1,386 @@
+================================================================================
+  GitLab AI Chatbot — Project Documentation
+  GenAI Chatbot for GitLab Handbook & Direction
+================================================================================
+
+AUTHOR
+------
+Shivam Rai
+
+LIVE URL
+--------
+https://gen-ai-chatbot-beta.vercel.app/
+
+REPOSITORY
+----------
+https://github.com/shivamrai009/Gen-AI-chatbot
+
+
+================================================================================
+1. PROBLEM STATEMENT
+================================================================================
+
+GitLab's Handbook and Direction pages contain thousands of pages of knowledge
+about processes, strategy, teams, engineering practices, and company values.
+Employees and candidates who need quick answers currently have to manually
+search or browse these documents. The goal was to build a conversational AI
+assistant that answers questions grounded in this content — not hallucinated
+general knowledge — and presents it in a clean, production-quality interface.
+
+Core requirements:
+  - Chatbot interface over GitLab Handbook and Direction content
+  - Streaming responses and follow-up question suggestions
+  - Source citations linking back to handbook pages
+  - Error handling and off-scope request handling
+  - Public deployment accessible via URL
+  - Detailed setup documentation
+
+
+================================================================================
+2. APPROACH & ARCHITECTURE
+================================================================================
+
+2.1 Single-Platform Deployment (Next.js on Vercel)
+---------------------------------------------------
+The project started as a separate Python (FastAPI) backend + React/Vite
+frontend. For production deployment, the entire app was migrated to Next.js
+(App Router) so both frontend and backend logic run on a single Vercel
+deployment. This removes the need to manage two separate services, handles
+CORS automatically, and gives zero-config CI/CD on every git push.
+
+Architecture overview:
+
+  User Browser
+      │  (Server-Sent Events)
+      ▼
+  Next.js on Vercel
+      ├── /api/chat/stream        — RAG pipeline entry point
+      ├── /api/auth/*             — JWT register / login / me
+      ├── /api/conversations/*    — conversation CRUD + message history
+      └── /api/feedback           — thumbs up/down per answer
+
+  lib/orchestrator.js (pipeline):
+      1. checkGuardrails()        — blocks harmful / off-scope queries
+      2. routeQuery()             — decides retrieval strategy
+      3. embedText()              — Gemini embedding-001 (3072-dim vector)
+      4. searchVector()           — cosine similarity over local JSON index
+      5. generateAnswer()         — Gemini 2.0 Flash with multi-turn history
+      6. evaluateCritic()         — grounding check, one automatic retry
+      7. generateFollowups()      — 3 contextual follow-up questions
+
+  Storage:
+      Vercel KV (Upstash Redis)   — user accounts, conversations, messages
+      data/vector_index.json      — 44MB pre-built embedding index (committed)
+      data/knowledge_graph.json   — entity relationship graph (committed)
+
+
+2.2 Hybrid Retrieval (Vector + Knowledge Graph)
+-----------------------------------------------
+Plain vector search returns semantically similar chunks but can miss
+relational questions ("what is the relationship between X and Y?"). A
+knowledge graph of entities extracted from the handbook allows graph-based
+retrieval for relational queries.
+
+The query router selects the retrieval mode:
+  - "vector"  — default, semantic similarity over all indexed chunks
+  - "hybrid"  — vector + graph (triggered by relational terms: connect,
+                 relationship, impact, between, dependency, owner, etc.)
+  - "clarify" — query too short or vague; asks for more detail
+  - "reject"  — clearly off-domain (weather, movies, crypto trading, etc.)
+
+Why this matters: A question like "What is the relationship between GitLab's
+security team and the compliance okrs?" routes to hybrid, pulling both the
+most similar chunks and entity relationships — giving richer context to the LLM.
+
+
+2.3 Embeddings: Gemini embedding-001 at 3072 Dimensions
+---------------------------------------------------------
+Google's gemini-embedding-001 model produces 3072-dimensional embeddings,
+which capture much richer semantic signal than older 768-dim models. The full
+index (~44MB) is committed to the repository and loaded at server startup with
+module-level caching, so subsequent requests have near-zero retrieval overhead
+on Vercel's serverless functions.
+
+URL diversity is enforced during retrieval: if the top-K results all come from
+the same page, the algorithm promotes the best result from other pages into
+the result set. This prevents one high-ranking page from dominating every
+answer and ensures breadth of citation.
+
+
+2.4 Guardrails
+--------------
+Three independent checks run before any LLM call:
+
+  1. Security block — hardcoded blocklist of harmful terms (sql injection,
+     xss, malware, exploit, ddos, credential stuffing). Returns a polite
+     refusal immediately.
+
+  2. Off-scope block — explicit out-of-domain terms (write code, recipe,
+     crypto trading, movie recommendation). Returns a scope explanation.
+
+  3. Domain-ratio check — for new conversations (no history), tokenises the
+     question and checks what fraction of tokens match GitLab domain terms
+     (gitlab, handbook, direction, ci, cd, okr, pipeline, etc.). If fewer
+     than 6% of tokens are domain terms the query is likely off-topic. This
+     check is deliberately skipped when conversation history exists — short
+     follow-ups like "what about engineering?" would incorrectly fail it.
+
+Design choice: the domain-ratio threshold (0.06) was tuned to avoid false
+positives on genuine handbook questions while still catching clearly off-scope
+queries. It is intentionally permissive to favour helpfulness.
+
+
+2.5 AI Critic with Automatic Retry
+-----------------------------------
+After the LLM generates an answer, a critic function measures lexical overlap
+between the answer tokens and the retrieved source snippets. If fewer than 8%
+of answer tokens appear in the source material, the answer is flagged as
+weakly grounded and the orchestrator makes one more LLM call with an explicit
+instruction to "answer strictly from the provided context."
+
+This addresses a known failure mode of RAG systems where the LLM supplements
+retrieved context with its own parametric knowledge, producing confident but
+hallucinated answers. The critic does not guarantee correctness but catches
+obvious cases of the model going off-piste.
+
+
+2.6 Multi-Turn Context
+-----------------------
+Each chat API call receives the full conversation history as an array of
+{role, content} turns. This is passed to the Gemini API as a multi-turn
+`contents` array (using "model" for assistant turns as the Gemini API
+requires), giving the LLM access to prior exchanges.
+
+A subtlety: short follow-up replies like "yes", "tell me more", or "what
+about the security team?" have no semantic signal for the retriever. The
+orchestrator detects messages with 4 words or fewer in an active conversation
+and enriches the retrieval query by prepending the last user message:
+
+  retrievalQuery = "<last user question> <current short reply>"
+
+This ensures the embedding search targets the right topic area even when the
+user's actual message has no retrievable content on its own.
+
+
+2.7 Streaming (Server-Sent Events)
+------------------------------------
+Answers are streamed word-by-word over SSE. The Next.js route handler returns
+a ReadableStream with Content-Type: text/event-stream. The frontend parses
+named events:
+
+  event: message    — one word token, appended to the current bubble
+  event: meta       — model name, route, trace ID, critic pass flag
+  event: sources    — JSON array of {title, url, snippet}
+  event: followups  — JSON array of 3 follow-up question strings
+  event: done       — signals end of stream
+  event: error      — surface any server-side error to the UI
+
+Newlines inside tokens are escaped to \\n before sending and unescaped on
+the client to prevent mid-stream SSE frame splits from corrupting the event
+format.
+
+
+2.8 Authentication & Storage
+-----------------------------
+Users register and log in with username + bcrypt-hashed password. A JWT
+(HS256, 7-day expiry) is issued on login and stored in localStorage. Every
+API call except /api/health requires a valid Bearer token.
+
+Conversations and messages are persisted in Vercel KV (Upstash Redis) using
+a simple key-value schema:
+  user:{id}                    → user record
+  users:index                  → username → id lookup
+  conv:{userId}                → list of conversation IDs
+  conv:{id}:meta               → conversation metadata
+  conv:{id}:messages           → list of message objects
+  feedback:{traceId}           → thumbs up/down + optional comment
+
+For local development without KV credentials, the app falls back to an
+in-memory Map with identical API surface. No configuration change is needed.
+
+
+2.9 Follow-Up Questions
+------------------------
+After every answer, the orchestrator calls generateFollowups() which asks
+Gemini to produce exactly 3 follow-up questions as a JSON array. Three
+parsing strategies handle model non-compliance:
+  1. Direct JSON.parse of the response
+  2. Strip markdown code fences, then parse
+  3. Regex scan for the first [...] in the response
+
+If Gemini fails (rate limit, API error), the same prompt is sent to Groq
+(llama-3.1-8b-instant) as a fallback. Follow-up chips render as clickable
+buttons below each answer that pre-fill and immediately submit the next question.
+
+
+================================================================================
+3. TECHNICAL DECISIONS & TRADE-OFFS
+================================================================================
+
+Decision: Next.js over FastAPI + Vite separation
+  Benefit: Single git push → single deployment. No CORS headers, no separate
+           backend URL configuration, no two-service orchestration.
+  Trade-off: Python evaluation and index-building scripts still require a local
+             Python environment. These are offline/dev-time tools, not
+             runtime dependencies.
+
+Decision: Commit vector_index.json to git (44MB)
+  Benefit: Vercel serverless functions have no persistent disk. Committing the
+           index means it's available at runtime without an external vector DB.
+  Trade-off: Repo becomes large. Solved by adding the file to .gitignore only
+             for runtime data files (chats, users) not the index itself.
+  Alternative considered: Pinecone or Supabase pgvector. Rejected because they
+             add a paid dependency and cold-start latency.
+
+Decision: Module-level caching for the 44MB index
+  In Node.js, module-level variables persist for the lifetime of the process.
+  On Vercel, a warm instance keeps the index in memory across requests. Cold
+  starts pay the ~200ms parse cost once, not per request.
+
+Decision: Groq fallback (llama-3.1-8b-instant) for follow-ups
+  Follow-up generation is the lowest-stakes LLM call (questions, not answers).
+  If Gemini is rate-limited, Groq provides a free, fast alternative with an
+  OpenAI-compatible API, requiring only a different base URL and auth header.
+
+Decision: Lexical critic instead of semantic critic
+  A semantic critic (embedding similarity between answer and sources) would be
+  more accurate but costs one extra embedding API call per request. Lexical
+  overlap (shared tokens) is a reasonable approximation that runs in <1ms
+  with no API dependency.
+
+Decision: Domain-ratio guardrail skipped for conversations
+  A short follow-up in an active conversation ("what about engineering?")
+  will have near-zero domain-term ratio. Applying the check would block
+  legitimate follow-ups. Skipping it for non-empty history is a deliberate
+  UX decision that accepts the trade-off of slightly less aggressive filtering
+  in multi-turn sessions.
+
+
+================================================================================
+4. EVALUATION METHODOLOGY
+================================================================================
+
+The evaluation script (scripts/evaluate.py) runs a fixed set of questions
+through the full pipeline and reports five metrics:
+
+  1. Citation Coverage    — % of answers that include at least one source URL
+  2. Keyword Adequacy     — % of answers containing key terms from the question
+  3. Route Accuracy       — % of questions routed to the expected route type
+  4. Guardrail Handling   — % of off-scope/harmful queries correctly blocked
+  5. Critic Pass Rate     — % of answers passing the grounding check first-try
+
+These metrics run against eval/questions.json which contains a curated set of:
+  - In-scope handbook questions
+  - Relational questions (expected to route hybrid)
+  - Off-scope questions (expected to be rejected/clarified)
+  - Adversarial / harmful queries (expected to be blocked)
+
+The evaluation is intentionally lightweight — it does not use human raters.
+It provides a repeatable regression check that can run in CI to catch
+regressions in routing or guardrail logic.
+
+
+================================================================================
+5. FEATURES BUILT BEYOND THE BRIEF
+================================================================================
+
+The following were not in the minimum requirements but were included to
+demonstrate production thinking:
+
+  - JWT authentication with register/login
+  - Persistent conversation history (Vercel KV + in-memory fallback)
+  - Light/dark theme with flash-free system preference detection
+  - Full markdown rendering in chat (tables, code blocks, lists via remark-gfm)
+  - Thumbs up/down feedback per answer (stored for future analysis)
+  - Structured telemetry traces (route, retrieval, generation, critic per request)
+  - Incremental index sync (scripts/sync_index.py using URL checksums)
+  - AI critic with automatic retry
+  - Multi-turn context enrichment for short follow-up replies
+  - URL diversity enforcement in retrieval results
+  - Groq fallback LLM for follow-up generation resilience
+  - GitHub Actions CI workflow + scheduled index sync workflow
+
+
+================================================================================
+6. WHAT I WOULD IMPROVE WITH MORE TIME
+================================================================================
+
+  1. Re-ranking — add a cross-encoder re-ranking step after initial vector
+     retrieval to improve precision of the top-K sources before LLM generation.
+
+  2. Deeper knowledge graph traversal — current graph retrieval uses one-hop
+     entity lookup. Multi-hop traversal would improve answers to complex
+     relational queries.
+
+  3. Human evaluation loop — store user thumbs up/down and use them to
+     identify systematic weak spots in retrieval or prompting.
+
+  4. Streaming embeddings — the current bottleneck for response latency is the
+     embedding API call (non-streamable). Caching recent query embeddings in
+     KV would reduce repeat-question latency.
+
+  5. Semantic critic — replace lexical overlap with cosine similarity between
+     the answer embedding and source embeddings for a more robust grounding
+     signal, with rate-limit awareness to avoid added cost on every request.
+
+  6. Answer confidence display — surface the critic pass flag and route type
+     to the user as a subtle "confidence indicator" rather than just logging
+     it in metadata.
+
+  7. Source freshness — the handbook is updated frequently. The incremental
+     sync script exists but is only run manually. A scheduled GitHub Actions
+     job running sync_index.py weekly would keep the index current.
+
+
+================================================================================
+7. RUNNING THE PROJECT LOCALLY
+================================================================================
+
+Prerequisites: Node.js 20+, a Gemini API key
+
+  cd nextapp
+  cp .env.example .env.local
+  # Add GEMINI_API_KEY to .env.local
+  npm install
+  npm run dev
+
+Open http://localhost:3000.
+Without KV credentials, the app uses in-memory storage (data resets on restart).
+
+Full details in README.md and DEPLOY.md.
+
+
+================================================================================
+8. DEPLOYMENT
+================================================================================
+
+Platform: Vercel (Next.js, automatic on push to main)
+Root Directory: nextapp/
+Storage: Vercel KV (Upstash Redis) for user accounts and chat history
+
+Required environment variables in Vercel:
+  GEMINI_API_KEY       — from aistudio.google.com
+  JWT_SECRET           — 32+ char random string
+  KV_REST_API_URL      — from Vercel KV database
+  KV_REST_API_TOKEN    — from Vercel KV database
+  GROQ_API_KEY         — optional, from console.groq.com
+
+
+================================================================================
+9. TECH STACK SUMMARY
+================================================================================
+
+  Framework:       Next.js 16 (App Router)
+  LLM:             Gemini 2.0 Flash (gemini-2.0-flash)
+  Embeddings:      Gemini embedding-001 (3072 dimensions)
+  Fallback LLM:    Groq — Llama 3.1 8B Instant
+  Auth:            jose (JWT HS256) + bcryptjs
+  Storage:         Vercel KV (Upstash Redis) / in-memory fallback
+  Retrieval:       Local JSON cosine similarity + entity knowledge graph
+  Streaming:       Server-Sent Events (ReadableStream)
+  UI:              React 19, CSS custom properties (light/dark theme)
+  Markdown:        react-markdown + remark-gfm
+  Deployment:      Vercel
+  Index Building:  Python, BeautifulSoup, httpx, NumPy (offline scripts)
+
+================================================================================

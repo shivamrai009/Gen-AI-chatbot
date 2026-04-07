@@ -5,15 +5,17 @@ const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 function buildPrompt(question, sources) {
   const formatted = sources
-    .map((s) => `Source: ${s.title}\nURL: ${s.url}\nSnippet: ${s.snippet}`)
-    .join('\n\n');
+    .map((s) => `Source: ${s.title}\nURL: ${s.url}\nContent: ${s.snippet}`)
+    .join('\n\n---\n\n');
 
   return (
-    'You are a helpful assistant for GitLab handbook and direction questions. ' +
-    'Only answer using the provided source snippets. If the context is insufficient, ' +
-    'say what is missing and suggest where to look.\n\n' +
+    'You are a knowledgeable assistant for GitLab handbook and direction questions. ' +
+    'Use the provided source content to give a clear, direct, and helpful answer. ' +
+    'Synthesize information across sources — do not just quote them. ' +
+    'If the sources contain partial information, use it fully and note what additional sections might help. ' +
+    'Never say the context is empty or missing when sources are provided — always extract the most useful answer you can.\n\n' +
     `Question:\n${question}\n\n` +
-    `Context:\n${formatted}`
+    `Source Content:\n${formatted}`
   );
 }
 

@@ -50,7 +50,7 @@ class VectorRetriever:
         return Source(
             title=chunk.title,
             url=chunk.url,
-            snippet=chunk.snippet,
+            snippet=chunk.chunk_text or chunk.snippet,
             section=chunk.section_path,
         )
 

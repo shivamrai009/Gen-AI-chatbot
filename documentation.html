@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GitLab AI Chatbot — Project Documentation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:   #FC6D26;
+      --accent2:  #6E49CB;
+      --dark:     #1a1a2e;
+      --mid:      #2d2d44;
+      --text:     #1e1e2e;
+      --muted:    #6b7280;
+      --border:   #e5e7eb;
+      --surface:  #f9fafb;
+      --tag-bg:   #fef3ec;
+      --tag-text: #c2410c;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      background: #fff;
+      line-height: 1.7;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ── COVER PAGE ── */
+    .cover {
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--dark) 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 80px 90px;
+      page-break-after: always;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover::before {
+      content: '';
+      position: absolute;
+      top: -120px; right: -120px;
+      width: 480px; height: 480px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(252,109,38,0.18) 0%, transparent 70%);
+    }
+
+    .cover::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; left: 40%;
+      width: 360px; height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(110,73,203,0.15) 0%, transparent 70%);
+    }
+
+    .cover-tag {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+
+    .cover h1 {
+      font-size: 52px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      max-width: 640px;
+    }
+
+    .cover-sub {
+      font-size: 20px;
+      color: rgba(255,255,255,0.65);
+      font-weight: 300;
+      margin-bottom: 48px;
+      max-width: 520px;
+    }
+
+    .cover-divider {
+      width: 64px;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      margin-bottom: 48px;
+    }
+
+    .cover-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .cover-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cover-meta-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      width: 90px;
+    }
+
+    .cover-meta-value {
+      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      font-weight: 400;
+    }
+
+    .cover-badges {
+      position: absolute;
+      bottom: 80px; right: 90px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .badge {
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .badge-orange { background: rgba(252,109,38,0.2); color: #FC6D26; border: 1px solid rgba(252,109,38,0.3); }
+    .badge-purple { background: rgba(110,73,203,0.2); color: #a78bfa; border: 1px solid rgba(110,73,203,0.3); }
+    .badge-green  { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+
+    /* ── CONTENT PAGES ── */
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 72px 80px;
+    }
+
+    @media print {
+      .page { padding: 48px 60px; }
+      .cover { min-height: 100vh; }
+    }
+
+    /* ── SECTION HEADERS ── */
+    .section-number {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 32px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--dark);
+      margin: 32px 0 12px;
+    }
+
+    h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 24px 0 8px;
+    }
+
+    p { margin-bottom: 14px; color: #374151; font-size: 15px; }
+
+    /* ── PIPELINE DIAGRAM ── */
+    .pipeline {
+      background: var(--dark);
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin: 24px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.8;
+    }
+
+    .pipeline .step-num { color: var(--accent); font-weight: 700; }
+    .pipeline .step-fn  { color: #a78bfa; }
+    .pipeline .step-desc{ color: rgba(255,255,255,0.5); }
+    .pipeline .arrow    { color: rgba(255,255,255,0.3); }
+
+    /* ── CARDS GRID ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      background: var(--surface);
+    }
+
+    .card-icon {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    .card h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--dark);
+      text-transform: none;
+      letter-spacing: 0;
+      margin: 0 0 6px;
+    }
+
+    .card p {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    /* ── TABLE ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    thead tr {
+      background: var(--dark);
+      color: #fff;
+    }
+
+    thead th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:nth-child(even) { background: var(--surface); }
+    tbody td { padding: 11px 16px; color: #374151; }
+    tbody td:first-child { font-weight: 500; color: var(--dark); }
+
+    /* ── STATUS BADGES ── */
+    .status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .status-done    { background: #dcfce7; color: #15803d; }
+    .status-partial { background: #fef9c3; color: #a16207; }
+    .status-no      { background: #fee2e2; color: #b91c1c; }
+
+    /* ── DECISION BLOCK ── */
+    .decision {
+      border-left: 4px solid var(--accent);
+      padding: 14px 20px;
+      background: var(--tag-bg);
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+
+    .decision strong { color: var(--dark); font-size: 14px; }
+    .decision p { font-size: 13.5px; color: #4b5563; margin: 4px 0 0; }
+
+    /* ── METRICS ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .metric {
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 10px;
+      background: var(--surface);
+    }
+
+    .metric-num {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    /* ── CODE ── */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: #c2410c;
+    }
+
+    pre {
+      background: var(--dark);
+      color: rgba(255,255,255,0.85);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+
+    /* ── TIMELINE / STEPS ── */
+    .steps { margin: 20px 0; }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 18px;
+      align-items: flex-start;
+    }
+
+    .step-dot {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-body strong { font-size: 14px; color: var(--dark); }
+    .step-body p { font-size: 13.5px; color: #4b5563; margin: 3px 0 0; }
+
+    /* ── IMPROVEMENT ITEMS ── */
+    .improvement {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .improvement:last-child { border-bottom: none; }
+
+    .imp-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent2);
+      background: rgba(110,73,203,0.08);
+      border-radius: 4px;
+      padding: 3px 8px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .imp-body strong { font-size: 14px; color: var(--dark); }
+    .imp-body p { font-size: 13.5px; color: #4b5563; margin: 3px 0 0; }
+
+    /* ── TECH STACK PILLS ── */
+    .stack-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .stack-pill {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      background: var(--surface);
+      min-width: 140px;
+    }
+
+    .stack-pill span:first-child {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    .stack-pill span:last-child {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+
+    /* ── PAGE BREAK ── */
+    .break { page-break-after: always; }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 64px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    ul { padding-left: 20px; margin-bottom: 14px; }
+    ul li { font-size: 14.5px; color: #374151; margin-bottom: 5px; line-height: 1.6; }
+
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(252,109,38,0.06), rgba(110,73,203,0.06));
+      border: 1px solid rgba(252,109,38,0.2);
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ COVER ═══════════════════ -->
+<div class="cover">
+  <div class="cover-tag">Round 2 Assignment Submission</div>
+  <h1>GitLab AI Chatbot</h1>
+  <div class="cover-sub">
+    A production-grade conversational AI assistant over the GitLab Handbook
+    and Direction — built with hybrid RAG, agentic orchestration, and
+    deployed on Vercel.
+  </div>
+  <div class="cover-divider"></div>
+  <div class="cover-meta">
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Author</span>
+      <span class="cover-meta-value">Shivam Rai</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Date</span>
+      <span class="cover-meta-value">April 5, 2026</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Stack</span>
+      <span class="cover-meta-value">Next.js · Gemini 2.0 Flash · Vercel</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Live URL</span>
+      <span class="cover-meta-value">https://gen-ai-chatbot-beta.vercel.app/</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">GitHub</span>
+      <span class="cover-meta-value">https://github.com/shivamrai009/Gen-AI-chatbot</span>
+    </div>
+  </div>
+
+  <div class="cover-badges">
+    <span class="badge badge-orange">Gemini 2.0 Flash</span>
+    <span class="badge badge-purple">Hybrid RAG</span>
+    <span class="badge badge-green">Deployed on Vercel</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 1 — OVERVIEW ═══════════════════ -->
+<div class="page break">
+
+  <div class="section-number">Section 01</div>
+  <h2>Problem Statement & Objective</h2>
+
+  <p>
+    GitLab's Handbook and Direction pages contain thousands of pages of knowledge
+    about processes, strategy, teams, engineering practices, and company values.
+    Employees and candidates who need quick answers currently have to manually search
+    or browse these documents.
+  </p>
+
+  <p>
+    The goal was to build a <strong>conversational AI assistant</strong> that answers
+    questions grounded in this content — not hallucinated general knowledge — and
+    presents it in a clean, production-quality interface.
+  </p>
+
+  <div class="highlight-box">
+    <h4 style="margin-top:0">Core Requirements</h4>
+    <ul style="margin-bottom:0">
+      <li>Chatbot interface over GitLab Handbook and Direction content</li>
+      <li>Streaming responses with follow-up question suggestions</li>
+      <li>Source citations linking back to handbook pages</li>
+      <li>Error handling and off-scope request guardrailing</li>
+      <li>Public deployment accessible via a live URL</li>
+      <li>Detailed setup documentation and GitHub repository</li>
+    </ul>
+  </div>
+
+  <div class="section-number" style="margin-top:48px">Section 02</div>
+  <h2>System Architecture</h2>
+
+  <p>
+    The application is built entirely on <strong>Next.js 16 (App Router)</strong> and deployed
+    on Vercel — a single platform for both frontend and backend. This eliminates
+    CORS configuration, removes the need to manage two separate services, and provides
+    zero-config CI/CD on every git push.
+  </p>
+
+  <div class="pipeline">
+    <div style="color:rgba(255,255,255,0.4); margin-bottom:12px; font-size:12px">RAG PIPELINE — lib/orchestrator.js</div>
+    <div><span class="step-num">1.</span> <span class="step-fn">checkGuardrails()</span>  <span class="arrow">→</span>  <span class="step-desc">Block harmful / off-scope queries before any LLM call</span></div>
+    <div><span class="step-num">2.</span> <span class="step-fn">routeQuery()</span>       <span class="arrow">→</span>  <span class="step-desc">Decide: clarify / reject / vector / hybrid</span></div>
+    <div><span class="step-num">3.</span> <span class="step-fn">embedText()</span>        <span class="arrow">→</span>  <span class="step-desc">Gemini embedding-001 (3072-dim), query enrichment for short replies</span></div>
+    <div><span class="step-num">4.</span> <span class="step-fn">searchVector()</span>     <span class="arrow">→</span>  <span class="step-desc">Cosine similarity over local JSON index, URL-diverse top-K</span></div>
+    <div><span class="step-num">5.</span> <span class="step-fn">generateAnswer()</span>   <span class="arrow">→</span>  <span class="step-desc">Gemini 2.0 Flash with full multi-turn history</span></div>
+    <div><span class="step-num">6.</span> <span class="step-fn">evaluateCritic()</span>  <span class="arrow">→</span>  <span class="step-desc">Lexical grounding check — automatic retry if score &lt; 8%</span></div>
+    <div><span class="step-num">7.</span> <span class="step-fn">generateFollowups()</span><span class="arrow">→</span>  <span class="step-desc">3 contextual follow-up questions (Groq fallback)</span></div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">🔐</div>
+      <h4>Auth & Storage</h4>
+      <p>JWT (HS256) + bcryptjs. Conversations persisted in Vercel KV (Upstash Redis) with in-memory fallback for local dev.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <h4>Streaming (SSE)</h4>
+      <p>Word-by-word server-sent events via ReadableStream. Named events: message, meta, sources, followups, done, error.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🗂️</div>
+      <h4>Knowledge Index</h4>
+      <p>44MB vector_index.json committed to repo, module-level cached on Vercel. No external vector DB required.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🎨</div>
+      <h4>UI/UX</h4>
+      <p>Light/dark theme with flash-free system detection. Full GFM markdown rendering via react-markdown + remark-gfm.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GitLab AI Chatbot — Project Documentation</span>
+    <span>Shivam Rai · April 2026</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 2 — TECHNICAL DEPTH ═══════════════════ -->
+<div class="page break">
+
+  <div class="section-number">Section 03</div>
+  <h2>Technical Design Decisions</h2>
+
+  <h3>Hybrid Retrieval: Vector + Knowledge Graph</h3>
+  <p>
+    Plain vector search returns semantically similar chunks but can miss relational
+    questions. A knowledge graph of entities extracted from the handbook allows
+    graph-based retrieval for relational queries. The query router selects the mode:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Route</th><th>Trigger Condition</th><th>Retrieval Strategy</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>vector</td><td>Default semantic query</td><td>Cosine similarity over all indexed chunks</td></tr>
+      <tr><td>hybrid</td><td>Relational terms: connect, between, impact, owner…</td><td>Vector + knowledge graph entity lookup</td></tr>
+      <tr><td>clarify</td><td>≤2 words or vague pattern (tell me more, go on…)</td><td>Ask user for more detail — no retrieval</td></tr>
+      <tr><td>reject</td><td>Explicit off-topic terms (weather, recipe, crypto…)</td><td>Polite refusal — no LLM call</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Multi-Turn Context Enrichment</h3>
+  <p>
+    Short follow-up replies ("yes", "tell me more", "what about security?") have no
+    semantic signal for the retriever. When a message is ≤4 words in an active
+    conversation, the orchestrator enriches the retrieval query:
+  </p>
+  <pre>retrievalQuery = "&lt;last user question&gt; &lt;current short reply&gt;"</pre>
+  <p>
+    This ensures embedding search targets the right topic even when the user's actual
+    message contains no retrievable content on its own. The full conversation history
+    is still passed to the Gemini API as a multi-turn <code>contents</code> array.
+  </p>
+
+  <h3>Three-Layer Guardrails</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-dot">1</div>
+      <div class="step-body">
+        <strong>Security Block</strong>
+        <p>Hardcoded blocklist of harmful terms (sql injection, xss, malware, exploit, ddos). Returns a refusal immediately — no LLM call.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-dot">2</div>
+      <div class="step-body">
+        <strong>Off-Scope Block</strong>
+        <p>Explicit out-of-domain terms (write code, recipe, crypto trading, movie recommendation). Returns a scope explanation.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-dot">3</div>
+      <div class="step-body">
+        <strong>Domain-Ratio Check</strong>
+        <p>For new conversations, checks the fraction of tokens matching GitLab domain terms (gitlab, handbook, ci, okr, pipeline…). Below 6% → likely off-topic. Skipped for active conversations to avoid blocking short follow-ups.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>AI Critic with Automatic Retry</h3>
+  <p>
+    After the LLM generates an answer, the critic measures lexical overlap between
+    answer tokens and retrieved source snippets. If fewer than <strong>8% of answer
+    tokens</strong> appear in the source material, the answer is flagged as weakly
+    grounded and the orchestrator makes one more LLM call with an explicit instruction
+    to "answer strictly from the provided context." This catches obvious cases of the
+    model supplementing retrieved context with parametric knowledge.
+  </p>
+
+  <div class="decision">
+    <strong>Why lexical instead of semantic critic?</strong>
+    <p>A semantic critic (embedding similarity) would be more accurate but costs one extra embedding API call per request. Lexical overlap runs in &lt;1ms with no API dependency and catches the most egregious grounding failures.</p>
+  </div>
+
+  <div class="footer">
+    <span>GitLab AI Chatbot — Project Documentation</span>
+    <span>Shivam Rai · April 2026</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 3 — FEATURES & EVAL ═══════════════════ -->
+<div class="page break">
+
+  <div class="section-number">Section 04</div>
+  <h2>Requirements Checklist</h2>
+
+  <table>
+    <thead>
+      <tr><th>Requirement</th><th>Status</th><th>Implementation Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Chatbot over GitLab Handbook + Direction</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>Hybrid RAG over indexed handbook pages</td>
+      </tr>
+      <tr>
+        <td>Streaming responses</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>SSE via Next.js ReadableStream, word-by-word</td>
+      </tr>
+      <tr>
+        <td>Follow-up question suggestions</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>Gemini-generated, Groq fallback, 3 chips per answer</td>
+      </tr>
+      <tr>
+        <td>Source citations</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>Per-message source cards with URL links</td>
+      </tr>
+      <tr>
+        <td>Error handling / guardrails</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>3-layer guardrails + LLM retry on weak answers</td>
+      </tr>
+      <tr>
+        <td>Public deployment</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>Next.js on Vercel, auto-deploy on git push</td>
+      </tr>
+      <tr>
+        <td>GitHub repo with README</td>
+        <td><span class="status status-done">✓ Done</span></td>
+        <td>README, DEPLOY.md, .env.example all updated</td>
+      </tr>
+      <tr>
+        <td>Authentication</td>
+        <td><span class="status status-done">✓ Bonus</span></td>
+        <td>JWT HS256 + bcrypt, register/login/me endpoints</td>
+      </tr>
+      <tr>
+        <td>Chat history persistence</td>
+        <td><span class="status status-done">✓ Bonus</span></td>
+        <td>Vercel KV (Upstash Redis), in-memory fallback</td>
+      </tr>
+      <tr>
+        <td>Light/dark theme</td>
+        <td><span class="status status-done">✓ Bonus</span></td>
+        <td>CSS custom properties, flash-free system detection</td>
+      </tr>
+      <tr>
+        <td>Evaluation scripts</td>
+        <td><span class="status status-done">✓ Bonus</span></td>
+        <td>5 metrics: citation, keyword, route, guardrail, critic</td>
+      </tr>
+      <tr>
+        <td>Telemetry / observability</td>
+        <td><span class="status status-done">✓ Bonus</span></td>
+        <td>Structured per-request trace logs</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-number" style="margin-top:48px">Section 05</div>
+  <h2>Evaluation Methodology</h2>
+
+  <p>
+    The evaluation script (<code>scripts/evaluate.py</code>) runs a fixed set of questions
+    through the full pipeline and reports five metrics. These provide a repeatable
+    regression baseline that can run in CI.
+  </p>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-num">01</div>
+      <div class="metric-label">Citation Coverage</div>
+    </div>
+    <div class="metric">
+      <div class="metric-num">02</div>
+      <div class="metric-label">Keyword Adequacy</div>
+    </div>
+    <div class="metric">
+      <div class="metric-num">03</div>
+      <div class="metric-label">Route Accuracy</div>
+    </div>
+    <div class="metric">
+      <div class="metric-num">04</div>
+      <div class="metric-label">Guardrail Handling</div>
+    </div>
+    <div class="metric">
+      <div class="metric-num">05</div>
+      <div class="metric-label">Critic Pass Rate</div>
+    </div>
+  </div>
+
+  <p>
+    The question set (<code>eval/questions.json</code>) contains in-scope handbook
+    questions, relational questions (expected route: hybrid), off-scope queries
+    (expected: reject/clarify), and adversarial/harmful queries (expected: blocked).
+  </p>
+
+  <div class="footer">
+    <span>GitLab AI Chatbot — Project Documentation</span>
+    <span>Shivam Rai · April 2026</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 4 — DECISIONS & IMPROVEMENTS ═══════════════════ -->
+<div class="page break">
+
+  <div class="section-number">Section 06</div>
+  <h2>Key Trade-Offs</h2>
+
+  <div class="decision">
+    <strong>Next.js over FastAPI + Vite (separate services)</strong>
+    <p><strong>Benefit:</strong> Single git push → single Vercel deployment. No CORS, no two-service orchestration, no separate backend URL in frontend config.<br>
+    <strong>Trade-off:</strong> Python evaluation and index-building scripts still require a local Python environment. These are offline dev-time tools, not runtime dependencies.</p>
+  </div>
+
+  <div class="decision">
+    <strong>Commit vector_index.json to git (44MB)</strong>
+    <p><strong>Benefit:</strong> Vercel serverless functions have no persistent disk. Committing the index means it's available at runtime with no external vector DB.<br>
+    <strong>Alternative rejected:</strong> Pinecone / Supabase pgvector — adds a paid dependency and cold-start latency.<br>
+    <strong>Mitigation:</strong> Module-level caching in Node.js keeps the index in memory across warm requests; cold start pays the parse cost once.</p>
+  </div>
+
+  <div class="decision">
+    <strong>Groq fallback (Llama 3.1 8B) for follow-up questions</strong>
+    <p><strong>Benefit:</strong> Follow-up generation is the lowest-stakes LLM call. If Gemini is rate-limited, Groq provides a free, fast alternative using an OpenAI-compatible API.<br>
+    <strong>Why not for main answers:</strong> Llama 3.1 8B has lower factual accuracy and hallucination resistance than Gemini 2.0 Flash for domain-specific RAG.</p>
+  </div>
+
+  <div class="decision">
+    <strong>Domain-ratio guardrail skipped for active conversations</strong>
+    <p><strong>Rationale:</strong> A short follow-up in an active conversation ("what about engineering?") will have near-zero domain-term ratio. Applying the check would block legitimate follow-ups. Skipping it for non-empty history is a deliberate UX decision.</p>
+  </div>
+
+  <div class="section-number" style="margin-top:48px">Section 07</div>
+  <h2>Future Improvements</h2>
+
+  <div class="improvement">
+    <span class="imp-num">01</span>
+    <div class="imp-body">
+      <strong>Cross-encoder Re-ranking</strong>
+      <p>Add a re-ranking step after initial vector retrieval to improve precision of the top-K sources before LLM generation. This would reduce hallucination risk on ambiguous queries.</p>
+    </div>
+  </div>
+
+  <div class="improvement">
+    <span class="imp-num">02</span>
+    <div class="imp-body">
+      <strong>Multi-hop Graph Traversal</strong>
+      <p>Current knowledge graph retrieval uses one-hop entity lookup. Multi-hop traversal would improve answers to complex relational queries spanning multiple handbook sections.</p>
+    </div>
+  </div>
+
+  <div class="improvement">
+    <span class="imp-num">03</span>
+    <div class="imp-body">
+      <strong>Human Feedback Loop</strong>
+      <p>Thumbs up/down feedback is already stored. Build a pipeline to surface systematically low-rated answers and use them to identify weak spots in retrieval or prompting.</p>
+    </div>
+  </div>
+
+  <div class="improvement">
+    <span class="imp-num">04</span>
+    <div class="imp-body">
+      <strong>Query Embedding Cache</strong>
+      <p>The embedding API call is the main latency contributor (non-streamable). Caching recent query embeddings in KV would eliminate repeat-question latency significantly.</p>
+    </div>
+  </div>
+
+  <div class="improvement">
+    <span class="imp-num">05</span>
+    <div class="imp-body">
+      <strong>Semantic Critic</strong>
+      <p>Replace lexical overlap with cosine similarity between the answer embedding and source embeddings for a more robust grounding signal — with rate-limit awareness to avoid added cost on every request.</p>
+    </div>
+  </div>
+
+  <div class="improvement">
+    <span class="imp-num">06</span>
+    <div class="imp-body">
+      <strong>Scheduled Index Sync</strong>
+      <p>The incremental sync script exists but runs manually. A weekly GitHub Actions job running sync_index.py would keep the knowledge base current as the handbook updates.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GitLab AI Chatbot — Project Documentation</span>
+    <span>Shivam Rai · April 2026</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE 5 — SETUP & STACK ═══════════════════ -->
+<div class="page">
+
+  <div class="section-number">Section 08</div>
+  <h2>Tech Stack</h2>
+
+  <div class="stack-grid">
+    <div class="stack-pill"><span>Framework</span><span>Next.js 16 (App Router)</span></div>
+    <div class="stack-pill"><span>LLM</span><span>Gemini 2.0 Flash</span></div>
+    <div class="stack-pill"><span>Embeddings</span><span>Gemini embedding-001</span></div>
+    <div class="stack-pill"><span>Fallback LLM</span><span>Groq — Llama 3.1 8B</span></div>
+    <div class="stack-pill"><span>Auth</span><span>jose JWT + bcryptjs</span></div>
+    <div class="stack-pill"><span>Storage</span><span>Vercel KV (Upstash)</span></div>
+    <div class="stack-pill"><span>Retrieval</span><span>Cosine + Knowledge Graph</span></div>
+    <div class="stack-pill"><span>Streaming</span><span>Server-Sent Events</span></div>
+    <div class="stack-pill"><span>UI</span><span>React 19, CSS Themes</span></div>
+    <div class="stack-pill"><span>Markdown</span><span>react-markdown + remark-gfm</span></div>
+    <div class="stack-pill"><span>Deployment</span><span>Vercel</span></div>
+    <div class="stack-pill"><span>Index Build</span><span>Python, BeautifulSoup, httpx</span></div>
+  </div>
+
+  <div class="section-number" style="margin-top:48px">Section 09</div>
+  <h2>Local Setup</h2>
+
+  <h3>Prerequisites</h3>
+  <ul>
+    <li>Node.js 20+</li>
+    <li>Gemini API key — <code>aistudio.google.com/app/apikey</code> (free tier works)</li>
+  </ul>
+
+  <h3>Run Locally</h3>
+  <pre>cd nextapp
+cp .env.example .env.local
+# Add GEMINI_API_KEY to .env.local
+
+npm install
+npm run dev
+# Open http://localhost:3000</pre>
+
+  <p>Without <code>KV_REST_API_URL</code> set, the app uses in-memory storage — fine for local testing. Data resets on server restart.</p>
+
+  <h3>Deploy to Vercel</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-dot">1</div>
+      <div class="step-body"><strong>Import Repo</strong><p>New Project → Import GitHub repo → Set Root Directory to <code>nextapp/</code></p></div>
+    </div>
+    <div class="step">
+      <div class="step-dot">2</div>
+      <div class="step-body"><strong>Add Env Vars</strong><p>Set <code>GEMINI_API_KEY</code>, <code>JWT_SECRET</code>, <code>KV_REST_API_URL</code>, <code>KV_REST_API_TOKEN</code> in Project Settings</p></div>
+    </div>
+    <div class="step">
+      <div class="step-dot">3</div>
+      <div class="step-body"><strong>Deploy</strong><p>Click Deploy — every subsequent push to <code>main</code> triggers an automatic redeploy</p></div>
+    </div>
+  </div>
+
+  <div class="section-number" style="margin-top:48px">Section 10</div>
+  <h2>Submission Links</h2>
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Link</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Live Application</td><td>https://gen-ai-chatbot-beta.vercel.app/</td></tr>
+      <tr><td>GitHub Repository</td><td>https://github.com/shivamrai009/Gen-AI-chatbot</td></tr>
+      <tr><td>Documentation</td><td>This document</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>GitLab AI Chatbot — Project Documentation</span>
+    <span>Shivam Rai · April 2026</span>
+  </div>
+</div>
+
+</body>
+</html>

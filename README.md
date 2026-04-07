@@ -2,7 +2,7 @@
 
 A GenAI chatbot that lets GitLab employees and candidates explore the [GitLab Handbook](https://handbook.gitlab.com) and [Direction](https://about.gitlab.com/direction/) through a conversational interface. Built with Next.js (App Router) on Vercel and powered by Gemini 2.0 Flash.
 
-**Live demo:** _(add your Vercel URL here)_
+**Live demo:** https://gen-ai-chatbot-beta.vercel.app/
 
 ---
 

@@ -77,7 +77,7 @@ export function searchVector(queryEmbedding, topK = 4) {
   return [...selected, ...overflow].slice(0, topK).map((e) => ({
     title: e.title,
     url: e.url,
-    snippet: e.snippet,
+    snippet: e.chunk_text || e.snippet,
     section: e.section_path || e.section || 'General',
   }));
 }

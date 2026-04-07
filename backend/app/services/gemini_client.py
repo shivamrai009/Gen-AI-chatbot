@@ -119,17 +119,19 @@ class GeminiClient:
             return None
 
     def _build_prompt(self, question: str, sources: list[Source]) -> str:
-        formatted_sources = "\n\n".join(
-            f"Source: {source.title}\nURL: {source.url}\nSnippet: {source.snippet}"
+        formatted_sources = "\n\n---\n\n".join(
+            f"Source: {source.title}\nURL: {source.url}\nContent: {source.snippet}"
             for source in sources
         )
 
         return (
-            "You are a helpful assistant for GitLab handbook and direction questions. "
-            "Only answer using the provided source snippets. If the context is insufficient, "
-            "say what is missing and suggest where to look.\n\n"
+            "You are a knowledgeable assistant for GitLab handbook and direction questions. "
+            "Use the provided source content to give a clear, direct, and helpful answer. "
+            "Synthesize information across sources — do not just quote them. "
+            "If the sources contain partial information, use it fully and note what additional sections might help. "
+            "Never say the context is empty or missing when sources are provided — always extract the most useful answer you can.\n\n"
             f"Question:\n{question}\n\n"
-            f"Context:\n{formatted_sources}"
+            f"Source Content:\n{formatted_sources}"
         )
 
     def _extract_answer(self, payload: dict) -> str:
